@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="header">
+    <h1>Welcome back, Creator</h1>
+    <p>Your systems are running optimal. 16 processes active.</p>
+</div>
+
+<!-- Stats Row -->
+<div class="stats-grid">
+    <div class="stat-card glass-panel">
+        <div class="stat-label"><i data-lucide="cpu"></i> Active Workflows</div>
+        <div class="stat-value">3</div>
+        <div class="text-gradient">+2 from yesterday</div>
+    </div>
+    <div class="stat-card glass-panel">
+        <div class="stat-label"><i data-lucide="youtube"></i> YouTube Subs</div>
+        <div class="stat-value">12.5K</div>
+        <div style="color: var(--success); display: flex; align-items: center; gap: 4px;">
+            <i data-lucide="trending-up" size="16"></i> +12%
+        </div>
+    </div>
+    <div class="stat-card glass-panel">
+        <div class="stat-label"><i data-lucide="instagram"></i> Instagram</div>
+        <div class="stat-value">8,940</div>
+        <div style="color: var(--success); display: flex; align-items: center; gap: 4px;">
+            <i data-lucide="trending-up" size="16"></i> +5.3%
+        </div>
+    </div>
+</div>
+
+<!-- Recent Activity / Controls -->
+<div class="glass-panel" style="padding: 30px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h3><i data-lucide="zap"></i> Quick Actions</h3>
+        <button class="btn btn-primary">New Workflow</button>
+    </div>
+    
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+        <!-- Card 1 -->
+        <div style="background: rgba(255,255,255,0.05); padding: 20px; border-radius: 12px; border: 1px solid var(--glass-border);">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                <strong>Sora Automation</strong>
+                <span style="color: var(--success);">Running</span>
+            </div>
+            <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 15px;">
+                Generating "Baby Goat" video line-up. Next post scheduled for 14:00.
+            </p>
+            <div style="height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden;">
+                <div style="width: 70%; height: 100%; background: var(--accent-secondary);"></div>
+            </div>
+        </div>
+
+        <!-- Card 2 -->
+        <div style="background: rgba(255,255,255,0.05); padding: 20px; border-radius: 12px; border: 1px solid var(--glass-border);">
+             <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                <strong>Social Tracker</strong>
+                <span style="color: var(--text-secondary);">Idle</span>
+            </div>
+            <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 15px;">
+                Last update: 1 hour ago. Tracking 4 platforms.
+            </p>
+            <button class="btn" style="background: rgba(255,255,255,0.1); width: 100%; font-size: 0.9rem;">
+                Run Check Now
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}

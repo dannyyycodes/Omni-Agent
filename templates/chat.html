@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="glass-panel chat-container" style="height: 100%; max-height: 85vh; padding: 0; overflow: hidden;">
+    <div class="chat-messages" id="chat-messages">
+        <!-- Messages will appear here -->
+        <div class="message ai">
+            Hello! I'm OMNI, your automated agent. I can help you build workflows, track stats, or deploy code. What's
+            the plan today?
+        </div>
+        {% if file_context %}
+        <div class="message ai">
+            I see you uploaded a file. {{ file_context }}
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="chat-input-area">
+        <button class="btn"
+            style="background: transparent; border: 1px solid var(--glass-border); width: 50px; height: 50px; border-radius: 50%;">
+            <i data-lucide="paperclip" color="white"></i>
+        </button>
+        <input type="text" class="chat-input" id="message-input"
+            placeholder="Type your instruction... (e.g. 'Run the Sora workflow')">
+        <button class="send-btn" onclick="sendMessage()">
+            <i data-lucide="send" color="white"></i>
+        </button>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const input = document.getElementById('message-input');
+    const messages = document.getElementById('chat-messages');
+
+    input.addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') {
+            sendMessage();
+        }
+    });
+
+    async function sendMessage() {
+        const text = input.value;
+        if (!text) return;
+
+        // User Message
+        addMessage(text, 'user');
+        input.value = '';
+
+        // API Call
+        try {
+            const formData = new FormData();
+            formData.append('message', text);
+            // formData.append('project_id', 'current'); 
+
+            const response = await fetch('/api/chat', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (data.response) {
+                // Convert markdown-ish text to basic HTML (simple replace for bold)
+                let formatted = data.response.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                formatted = formatted.replace(/\n/g, '<br>');
+                addMessage(formatted, 'ai');
+            } else if (data.error) {
+                addMessage("Error: " + data.error, 'ai');
+            }
+        } catch (e) {
+            addMessage("Connection error. Is the server running?", 'ai');
+        }
+    }
+
+    function addMessage(text, sender) {
+        const div = document.createElement('div');
+        div.className = `message ${sender}`;
+        div.innerHTML = text; // Be careful with innerHTML in prod, but fine for local tool
+        messages.appendChild(div);
+        messages.scrollTop = messages.scrollHeight;
+    }
+</script>
+{% endblock %}

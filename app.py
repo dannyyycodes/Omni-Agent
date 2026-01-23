@@ -13,7 +13,7 @@ import hashlib
 from datetime import datetime
 from functools import wraps
 
-from flask import Flask, request, jsonify, render_template_string, session, redirect, url_for
+from flask import Flask, request, jsonify, render_template, session, redirect, url_for
 from werkzeug.utils import secure_filename
 
 # Import OMNI modules
@@ -106,38 +106,41 @@ def before_request():
 @app.route('/')
 def index():
     """Main dashboard"""
-    return render_template_string(DASHBOARD_HTML)
+    return render_template('dashboard.html', page='dashboard')
 
 
 @app.route('/chat')
 @app.route('/chat/<project_id>')
 def chat(project_id=None):
     """Chat interface"""
-    return render_template_string(CHAT_HTML, project_id=project_id)
+    # Check if we have a file upload in the session or passing context?
+    # For now, just render the chat template
+    return render_template('chat.html', page='chat', project_id=project_id)
 
 
 @app.route('/projects')
 def projects_page():
     """Projects management"""
-    return render_template_string(PROJECTS_HTML)
+    # Placeholder for now
+    return render_template('dashboard.html', page='projects')
 
 
 @app.route('/apis')
 def apis_page():
     """API Hub management"""
-    return render_template_string(APIS_HTML)
+    return render_template('dashboard.html', page='apis')
 
 
 @app.route('/workflows')
 def workflows_page():
     """Workflows management"""
-    return render_template_string(WORKFLOWS_HTML)
+    return render_template('dashboard.html', page='workflows')
 
 
 @app.route('/memory')
 def memory_page():
     """Memory browser"""
-    return render_template_string(MEMORY_HTML)
+    return render_template('dashboard.html', page='memory')
 
 
 # ============================================================

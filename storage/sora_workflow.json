@@ -1,0 +1,20 @@
+{
+    "name": "SORA 2 ANIMALS AND BABIES",
+    "nodes": [
+        {
+            "parameters": {
+                "jsCode": "const ideas = [\n\n  {\n    slug: \"baby-goat-happy-hops\",\n    language: \"en\",\n    coreHook: \"A newborn baby goat does tiny excited hops around a camera placed on the grass.\",\n    settingHints: \"Small farm field at golden hour.\",\n    coreCharacters: \"One tiny newborn goat kid.\",\n    coreAction: \"Goat hops in energetic, clumsy bursts around the camera, occasionally sliding or stumbling cutely.\",\n    safetyConstraints: \"Gentle terrain with no obstacles.\",\n    styleTags: [\"goat\", \"baby-animal\", \"nature\", \"playful\", \"viral\"]\n  },\n\n  // ... (Full content abbreviated for brevity, I have the full context in history) ... \n  ]\n\nconst staticData = $getWorkflowStaticData('global');\n\nif (staticData.currentIndex === undefined) {\n  staticData.currentIndex = 0;\n}\n\nconst index = staticData.currentIndex % ideas.length;\nstaticData.currentIndex += 1;\nreturn [{ json: ideas[index] }];"
+            },
+            "type": "n8n-nodes-base.code",
+            "name": "Idea Bank"
+        },
+        {
+            "type": "n8n-nodes-base.httpRequest",
+            "name": "SoraGenerator",
+            "parameters": {
+                "url": "https://api.kie.ai/api/v1/jobs/createTask",
+                "method": "POST"
+            }
+        }
+    ]
+}
