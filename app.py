@@ -106,22 +106,47 @@ def before_request():
 @app.route('/')
 def index():
     """Main dashboard"""
-    return render_template('dashboard.html', page='dashboard')
+    # 1. Get Social Stats
+    social_stats = None
+    if 'social_tracker' not in globals():
+        global social_tracker
+        from core.social_tracker import SocialTracker
+        social_tracker = SocialTracker()
+    
+    social_stats = social_tracker.get_stats()
+    
+    # 2. Get Workflow Status
+    # Initialize workflows if not executing
+    active_workflows = 3 # Placeholder count
+    
+    return render_template('dashboard.html', 
+                         page='dashboard', 
+                         stats=social_stats,
+                         active_workflows=active_workflows)
+
+
+@app.route('/api/refresh-stats', methods=['POST'])
+def refresh_stats():
+    """Force refresh social stats"""
+    if 'social_tracker' not in globals():
+        from core.social_tracker import SocialTracker
+        global social_tracker
+        social_tracker = SocialTracker()
+        
+    new_stats = social_tracker.update_all()
+    return jsonify(new_stats)
 
 
 @app.route('/chat')
 @app.route('/chat/<project_id>')
 def chat(project_id=None):
     """Chat interface"""
-    # Check if we have a file upload in the session or passing context?
-    # For now, just render the chat template
     return render_template('chat.html', page='chat', project_id=project_id)
 
 
 @app.route('/projects')
 def projects_page():
     """Projects management"""
-    # Placeholder for now
     return render_template('dashboard.html', page='projects')
 
 

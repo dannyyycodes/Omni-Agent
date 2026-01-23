@@ -1,0 +1,5 @@
+.env
+__pycache__/
+*.pyc
+omni.db
+omni_uploads/
