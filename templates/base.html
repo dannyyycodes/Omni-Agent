@@ -53,6 +53,20 @@
 
     <script>
         lucide.createIcons();
+
+        function toggleSidebar() {
+            document.querySelector('.sidebar').classList.toggle('open');
+            document.querySelector('.sidebar-overlay').classList.toggle('active');
+        }
+
+        // Close sidebar when clicking a nav item on mobile
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', () => {
+                if (window.innerWidth <= 768) {
+                    toggleSidebar();
+                }
+            });
+        });
     </script>
     {% block scripts %}{% endblock %}
 </body>
