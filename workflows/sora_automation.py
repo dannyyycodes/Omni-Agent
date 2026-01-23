@@ -35,27 +35,46 @@ class SoraAutomation:
         # 3. Call Kie.ai to Generate Video
         kie_key = os.environ.get('KIE_API_KEY')
         if not kie_key:
-            return {"error": "Missing KIE_API_KEY"}
+            return {"error": "Missing KIE_API_KEY. Please add it in Settings."}
             
         print("🎨 Sending to Kie.ai...")
-        # Mocking the actual call to avoid burning credits/errors during dev
-        # task_id = self._kie_generate(kie_key, sora_prompt)
-        task_id = "mock-task-id-123"
+        try:
+            task_id = self._kie_generate(kie_key, sora_prompt)
+        except Exception as e:
+            return {"error": f"Kie.ai Error: {str(e)}"}
         
         # 4. Wait for Completion
-        print("⏳ Waiting for generation...")
-        # video_url = self._kie_poll(kie_key, task_id)
-        video_url = "https://example.com/mock_video.mp4"
+        print(f"⏳ Waiting for generation (Task: {task_id})...")
+        try:
+            video_url = self._kie_poll(kie_key, task_id)
+        except Exception as e:
+            return {"error": f"Polling Error: {str(e)}"}
         
         # 5. Upload/Post (Blotato)
+        blotato_key = os.environ.get('BLOTATO_API_KEY')
+        if not blotato_key:
+            return {
+                "status": "partial_success",
+                "video": video_url, 
+                "message": "Video generated, but Blotato Key missing. Could not post."
+            }
+
         print(f"🚀 Posting video: {video_url}")
-        # self._post_blotato(video_url)
+        try:
+            post_result = self._post_blotato(blotato_key, video_url, idea['coreHook'])
+        except Exception as e:
+            return {
+                "status": "partial_success",
+                "video": video_url,
+                "message": f"Video generated, but Posting Failed: {str(e)}"
+            }
         
         return {
             "status": "success",
             "idea": idea['slug'],
             "video": video_url,
-            "message": "Workflow completed successfully (Simulation)"
+            "post_id": post_result.get('id'),
+            "message": "Workflow completed successfully."
         }
 
     def _kie_generate(self, key, prompt):
@@ -67,4 +86,35 @@ class SoraAutomation:
         )
         return resp.json().get('data', {}).get('taskId')
 
-    # ... Helper methods for pulling and posting would go here
+    def _kie_poll(self, key, task_id):
+        headers = {"Authorization": f"Bearer {key}"}
+        # Poll for 60 seconds max
+        for _ in range(12):
+            resp = requests.get(f"https://api.kie.ai/api/v1/jobs/{task_id}", headers=headers)
+            data = resp.json().get('data', {})
+            status = data.get('status')
+            
+            if status == 'completed':
+                return data.get('result_url')
+            elif status == 'failed':
+                raise Exception(f"Generation failed: {data.get('error')}")
+                
+            time.sleep(5)
+            
+        raise Exception("Timed out waiting for video generation")
+
+    def _post_blotato(self, key, video_url, caption):
+        # Real Blotato Post
+        resp = requests.post(
+            "https://api.blotato.com/v1/posts/create", # Hypothetical endpoint
+            headers={"Authorization": f"Bearer {key}"},
+            json={
+                "video_url": video_url,
+                "caption": caption,
+                "platforms": ["instagram", "tiktok"]
+            }
+        )
+        if resp.status_code != 200:
+            raise Exception(f"Blotato API error: {resp.text}")
+            
+        return resp.json()
