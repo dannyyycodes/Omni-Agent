@@ -55,15 +55,24 @@ class ModelRouter:
             )
             
             if response.status_code == 200:
-                return response.json()['choices'][0]['message']['content']
+                data = response.json()
+                if 'choices' in data and len(data['choices']) > 0:
+                    return data['choices'][0]['message']['content']
+                elif 'error' in data:
+                    return f"OpenRouter Error: {data['error'].get('message', str(data))}"
+                else:
+                    return f"Unexpected API Response: {str(data)[:200]}"
             else:
-                # Try fallback model
-                if model != self.fallback_model:
-                    return self.complete(prompt, system, self.fallback_model, max_tokens, temperature)
+                # Try fallback model if 5xx or specific 4xx
+                if response.status_code >= 500 or response.status_code == 429:
+                    if model != self.fallback_model:
+                        print(f"⚠️ Primary model {model} failed ({response.status_code}). Switching to fallback.")
+                        return self.complete(prompt, system, self.fallback_model, max_tokens, temperature)
+                
                 return f"API Error: {response.status_code} - {response.text[:200]}"
                 
         except Exception as e:
-            return f"Error: {str(e)}"
+            return f"Router Exception: {str(e)}"
     
     def list_available(self):
         """List available models"""
