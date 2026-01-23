@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,6 +10,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <script src="https://unpkg.com/lucide@latest"></script>
 </head>
+
 <body>
     <div class="layout">
         <aside class="sidebar glass-panel">
@@ -23,8 +25,11 @@
                     <i data-lucide="message-square"></i> Chat Agent
                 </a>
                 <div style="margin: 20px 0; border-bottom: 1px solid var(--glass-border);"></div>
-                <a href="#" class="nav-item">
+                <a href="/projects" class="nav-item">
                     <i data-lucide="folder"></i> Projects
+                </a>
+                <a href="/pipeline" class="nav-item {% if page == 'pipeline' %}active{% endif %}">
+                    <i data-lucide="kanban"></i> Pipeline (Live)
                 </a>
                 <a href="#" class="nav-item">
                     <i data-lucide="activity"></i> Social Tracker
@@ -45,4 +50,5 @@
     </script>
     {% block scripts %}{% endblock %}
 </body>
+
 </html>
