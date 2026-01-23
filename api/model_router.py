@@ -11,8 +11,9 @@ class ModelRouter:
     
     def __init__(self, api_hub):
         self.api_hub = api_hub
-        # Use Gemini 1.5 Pro - 2 Million Token Context (Infinite Memory)
-        self.default_model = 'google/gemini-pro-1.5'
+        # Use Gemini Flash 1.5 - 1 Million Token Context, Fast, High Availability
+        # The previous 'google/gemini-pro-1.5' slug was unstable/404ing.
+        self.default_model = 'google/gemini-flash-1.5'
         self.fallback_model = 'anthropic/claude-3-haiku'
     
     def _get_api_key(self):
@@ -31,6 +32,9 @@ class ModelRouter:
             return "Error: No OpenRouter API key. Add OPENROUTER_API_KEY to environment variables."
         
         model = model or self.default_model
+        
+        # Logging for debug
+        # print(f"🧠 Asking {model}...")
         
         messages = []
         if system:
@@ -63,8 +67,8 @@ class ModelRouter:
                 else:
                     return f"Unexpected API Response: {str(data)[:200]}"
             else:
-                # Try fallback model if 5xx or specific 4xx
-                if response.status_code >= 500 or response.status_code == 429:
+                # Try fallback model if 5xx or specific 4xx (including 404 Model Not Found)
+                if response.status_code >= 500 or response.status_code == 429 or response.status_code == 404:
                     if model != self.fallback_model:
                         print(f"⚠️ Primary model {model} failed ({response.status_code}). Switching to fallback.")
                         return self.complete(prompt, system, self.fallback_model, max_tokens, temperature)
