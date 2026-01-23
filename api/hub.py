@@ -352,3 +352,29 @@ class APIHub:
                 return {'error': f'HTTP {r.status_code}'}
         except Exception as e:
             return {'error': str(e)}
+
+    def universal_call(self, url, method='GET', headers=None, body=None):
+        """
+        Universal API Tool: Call ANY URL.
+        This allows the Agent to connect to unknown APIs dynamically.
+        """
+        try:
+            if method.upper() == 'GET':
+                r = requests.get(url, headers=headers, timeout=30)
+            elif method.upper() == 'POST':
+                r = requests.post(url, headers=headers, json=body, timeout=60)
+            elif method.upper() == 'PUT':
+                r = requests.put(url, headers=headers, json=body, timeout=60)
+            elif method.upper() == 'DELETE':
+                r = requests.delete(url, headers=headers, timeout=60)
+            else:
+                return {'error': f'Unknown method: {method}'}
+            
+            # Return JSON or Text
+            try:
+                return r.json()
+            except:
+                return {'text': r.text, 'status': r.status_code}
+                
+        except Exception as e:
+            return {'error': f"Universal Call Failed: {str(e)}"}
