@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OMNI - Command Center</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+    <div class="layout">
+        <aside class="sidebar glass-panel">
+            <div class="logo">
+                <i data-lucide="zap"></i> OMNI
+            </div>
+            <nav>
+                <a href="/" class="nav-item {% if page == 'dashboard' %}active{% endif %}">
+                    <i data-lucide="layout-dashboard"></i> Dashboard
+                </a>
+                <a href="/chat" class="nav-item {% if page == 'chat' %}active{% endif %}">
+                    <i data-lucide="message-square"></i> Chat Agent
+                </a>
+                <div style="margin: 20px 0; border-bottom: 1px solid var(--glass-border);"></div>
+                <a href="#" class="nav-item">
+                    <i data-lucide="folder"></i> Projects
+                </a>
+                <a href="#" class="nav-item">
+                    <i data-lucide="activity"></i> Social Tracker
+                </a>
+                <a href="#" class="nav-item">
+                    <i data-lucide="settings"></i> Settings
+                </a>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+
+    <script>
+        lucide.createIcons();
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>
