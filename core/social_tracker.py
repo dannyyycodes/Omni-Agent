@@ -42,22 +42,30 @@ class SocialTracker:
         # For now, we will simulate realistic growth to show the user it works.
         # In the future, we replace this with `requests.get('https://api.blotato.com/stats'...)`
         
-        # Simulate fetching data
-        current_yt = self.stats['youtube']['subs']
-        current_ig = self.stats['instagram']['subs']
+        if not self.blotato_key:
+            # If no key, acknowledge it. Don't fake 12,000 subs.
+            self.stats['last_updated'] = "Key Missing"
+            self._save_stats()
+            return self.stats
+
+        try:
+            # Real API call
+            resp = requests.get("https://api.blotato.com/v1/stats", headers={"Authorization": f"Bearer {self.blotato_key}"})
+            if resp.status_code == 200:
+                data = resp.json()
+                self.stats['youtube'] = data.get('youtube', {'subs': 0, 'growth': 0})
+                self.stats['instagram'] = data.get('instagram', {'subs': 0, 'growth': 0})
+                self.stats['last_updated'] = datetime.now().strftime("%H:%M")
+            elif resp.status_code in [401, 403]:
+                # Expired Subscription / Invalid Key
+                 self.stats['last_updated'] = "Auth Error (Expired?)"
+            else:
+                 self.stats['last_updated'] = "API Error"
+        except Exception:
+            self.stats['last_updated'] = "Connection Error"
         
-        # Add random growth (0-5 new subs) to show "aliveness"
-        new_yt_growth = random.randint(1, 5)
-        new_ig_growth = random.randint(2, 8)
-        
-        self.stats['youtube'] = {
-            'subs': current_yt + new_yt_growth if current_yt > 0 else 12500, # Start at 12.5k if 0
-            'growth': new_yt_growth
-        }
-        self.stats['instagram'] = {
-            'subs': current_ig + new_ig_growth if current_ig > 0 else 8940, # Start at 8.9k if 0
-            'growth': new_ig_growth
-        }
+        self._save_stats()
+        return self.stats
         self.stats['last_updated'] = datetime.now().strftime("%H:%M")
         
         self._save_stats()
