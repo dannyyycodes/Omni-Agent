@@ -1,0 +1,23 @@
+# OMNI - Requirements
+# Core
+flask==3.0.0
+gunicorn==21.2.0
+requests==2.31.0
+
+# Database
+sqlalchemy==2.0.23
+psycopg2-binary==2.9.9
+
+# Web scraping
+beautifulsoup4==4.12.2
+lxml==4.9.3
+
+# Scheduling
+croniter==2.0.1
+
+# File handling
+python-magic==0.4.27
+
+# Optional but recommended
+redis==5.0.1
+celery==5.3.4
