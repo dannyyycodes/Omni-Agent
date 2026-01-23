@@ -15,8 +15,14 @@
         {% endif %}
     </div>
 
+    <!-- Upload Status -->
+    <div id="upload-status" style="padding: 10px 20px; font-size: 0.8rem; color: var(--accent-primary); display: none;">
+        <i data-lucide="file"></i> <span id="filename-display"></span> attached
+    </div>
+
     <div class="chat-input-area">
-        <button class="btn"
+        <input type="file" id="file-input" style="display: none;" onchange="handleFileSelect(this)">
+        <button class="btn" onclick="document.getElementById('file-input').click()"
             style="background: transparent; border: 1px solid var(--glass-border); width: 50px; height: 50px; border-radius: 50%;">
             <i data-lucide="paperclip" color="white"></i>
         </button>
@@ -33,6 +39,7 @@
 <script>
     const input = document.getElementById('message-input');
     const messages = document.getElementById('chat-messages');
+    let selectedFile = null;
 
     input.addEventListener('keypress', function (e) {
         if (e.key === 'Enter') {
@@ -40,19 +47,39 @@
         }
     });
 
+    function handleFileSelect(input) {
+        if (input.files && input.files[0]) {
+            selectedFile = input.files[0];
+            document.getElementById('filename-display').innerText = selectedFile.name;
+            document.getElementById('upload-status').style.display = 'block';
+            lucide.createIcons();
+        }
+    }
+
     async function sendMessage() {
         const text = input.value;
-        if (!text) return;
+        if (!text && !selectedFile) return;
 
         // User Message
-        addMessage(text, 'user');
+        let displayMsg = text;
+        if (selectedFile) displayMsg += ` <br><small>[File: ${selectedFile.name}]</small>`;
+
+        addMessage(displayMsg, 'user');
         input.value = '';
+        document.getElementById('upload-status').style.display = 'none';
 
         // API Call
         try {
             const formData = new FormData();
             formData.append('message', text);
+            if (selectedFile) {
+                formData.append('file', selectedFile);
+                selectedFile = null; // Reset
+            }
             // formData.append('project_id', 'current'); 
+
+            addMessage('<i data-lucide="loader"></i> Thinking...', 'ai temporary');
+            lucide.createIcons();
 
             const response = await fetch('/api/chat', {
                 method: 'POST',
@@ -60,6 +87,10 @@
             });
 
             const data = await response.json();
+
+            // Remove temp loading message
+            const temp = document.querySelector('.temporary');
+            if (temp) temp.remove();
 
             if (data.response) {
                 // Convert markdown-ish text to basic HTML (simple replace for bold)
@@ -80,6 +111,7 @@
         div.innerHTML = text; // Be careful with innerHTML in prod, but fine for local tool
         messages.appendChild(div);
         messages.scrollTop = messages.scrollHeight;
+        lucide.createIcons();
     }
 </script>
 {% endblock %}
