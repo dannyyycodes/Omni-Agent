@@ -70,7 +70,8 @@ body {
     gap: 12px;
 }
 
-.nav-item:hover, .nav-item.active {
+.nav-item:hover,
+.nav-item.active {
     background: rgba(255, 255, 255, 0.1);
     color: var(--text-primary);
     transform: translateX(5px);
@@ -139,7 +140,8 @@ body {
 .chat-container {
     display: flex;
     flex-direction: column;
-    height: calc(100vh - 80px); /* Adjust based on padding */
+    height: calc(100vh - 80px);
+    /* Adjust based on padding */
 }
 
 .chat-messages {
@@ -239,4 +241,157 @@ body {
 .btn-primary:hover {
     transform: translateY(-2px);
     box-shadow: 0 6px 20px rgba(0, 210, 255, 0.4);
+}
+
+/* ============================================
+   MOBILE RESPONSIVE (Asus Zenfone 10 / 5.9")
+   ============================================ */
+
+/* Hamburger Menu Toggle (hidden by default) */
+.mobile-menu-toggle {
+    display: none;
+    background: transparent;
+    border: none;
+    color: var(--text-primary);
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 10px;
+}
+
+/* Medium screens (tablets) */
+@media (max-width: 1024px) {
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* Small screens (phones like Zenfone 10) */
+@media (max-width: 768px) {
+    .layout {
+        flex-direction: column;
+    }
+
+    .sidebar {
+        width: 100%;
+        height: auto;
+        padding: 15px;
+        border-right: none;
+        border-bottom: 1px solid var(--glass-border);
+        position: fixed;
+        top: 0;
+        left: 0;
+        z-index: 1000;
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+    }
+
+    .sidebar.open {
+        transform: translateX(0);
+    }
+
+    .mobile-menu-toggle {
+        display: flex;
+        position: fixed;
+        top: 15px;
+        left: 15px;
+        z-index: 1001;
+        background: var(--glass-bg);
+        border-radius: 8px;
+        border: 1px solid var(--glass-border);
+    }
+
+    .main-content {
+        padding: 70px 20px 20px 20px;
+        /* Top padding for menu button */
+        min-height: 100vh;
+    }
+
+    .header h1 {
+        font-size: 1.5rem;
+    }
+
+    .stats-grid {
+        grid-template-columns: 1fr;
+        gap: 15px;
+    }
+
+    .stat-card {
+        padding: 18px;
+    }
+
+    .stat-value {
+        font-size: 2rem;
+    }
+
+    /* Chat adjustments */
+    .chat-container {
+        height: calc(100vh - 70px);
+    }
+
+    .chat-input-area {
+        padding: 12px;
+        gap: 10px;
+    }
+
+    .chat-input {
+        padding: 12px;
+        font-size: 16px;
+        /* Prevent zoom on iOS */
+    }
+
+    .send-btn {
+        width: 44px;
+        height: 44px;
+    }
+
+    .message {
+        max-width: 90%;
+        padding: 12px 16px;
+    }
+
+    /* Pipeline board stacks vertically */
+    .pipeline-board {
+        grid-template-columns: 1fr !important;
+        height: auto !important;
+    }
+
+    .pipeline-col {
+        margin-bottom: 15px;
+    }
+}
+
+/* Extra small screens */
+@media (max-width: 400px) {
+    .main-content {
+        padding: 60px 12px 12px 12px;
+    }
+
+    .header h1 {
+        font-size: 1.3rem;
+    }
+
+    .stat-value {
+        font-size: 1.6rem;
+    }
+
+    .btn {
+        padding: 10px 16px;
+        font-size: 0.9rem;
+    }
+}
+
+/* Overlay when sidebar is open */
+.sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 999;
+}
+
+.sidebar-overlay.active {
+    display: block;
 }
