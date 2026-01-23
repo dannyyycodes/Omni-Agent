@@ -13,6 +13,12 @@
 
 <body>
     <div class="layout">
+        <!-- Mobile Menu Toggle -->
+        <button class="mobile-menu-toggle" onclick="toggleSidebar()">
+            <i data-lucide="menu"></i>
+        </button>
+        <div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+
         <aside class="sidebar glass-panel">
             <div class="logo">
                 <i data-lucide="zap"></i> OMNI
@@ -47,6 +53,20 @@
 
     <script>
         lucide.createIcons();
+
+        function toggleSidebar() {
+            document.querySelector('.sidebar').classList.toggle('open');
+            document.querySelector('.sidebar-overlay').classList.toggle('active');
+        }
+
+        // Close sidebar when clicking a nav item on mobile
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', () => {
+                if (window.innerWidth <= 768) {
+                    toggleSidebar();
+                }
+            });
+        });
     </script>
     {% block scripts %}{% endblock %}
 </body>
