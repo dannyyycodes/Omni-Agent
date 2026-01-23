@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="header">
+    <h1>Active Workflows</h1>
+    <p>Manage your autonomous agents and automations.</p>
+</div>
+
+<div class="glass-panel" style="padding: 30px;">
+    {% if workflows %}
+    <div style="display: grid; gap: 15px;">
+        {% for w in workflows %}
+        <div
+            style="background: rgba(255,255,255,0.05); padding: 20px; border-radius: 12px; border: 1px solid var(--glass-border); display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <strong>{{ w.name }}</strong>
+                <div style="font-size: 0.85rem; color: var(--text-secondary);">Trigger: {{ w.trigger }}</div>
+            </div>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <span
+                    style="font-size: 0.8rem; padding: 4px 8px; border-radius: 4px; background: {% if w.enabled %}rgba(0,255,135,0.1); color: var(--success);{% else %}rgba(255,255,255,0.1);{% endif %}">
+                    {{ 'Active' if w.enabled else 'Paused' }}
+                </span>
+                <button class="btn" style="padding: 8px;" onclick="window.location.href='/chat?msg=Run {{ w.name }}'">
+                    <i data-lucide="play" size="16"></i>
+                </button>
+                <button class="btn" style="padding: 8px;">
+                    <i data-lucide="settings" size="16"></i>
+                </button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div style="text-align: center; padding: 40px; color: var(--text-secondary);">
+        <i data-lucide="ghost" size="48" style="margin-bottom: 20px; opacity: 0.5;"></i>
+        <p>No workflows found yet.</p>
+        <button class="btn btn-primary" style="margin-top: 20px;"
+            onclick="window.location.href='/chat?msg=Create a new workflow'">Create One</button>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
