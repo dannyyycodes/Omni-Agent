@@ -11,8 +11,8 @@ class ModelRouter:
     
     def __init__(self, api_hub):
         self.api_hub = api_hub
-        # Use Claude 3.5 Sonnet - best coding/reasoning model
-        self.default_model = 'anthropic/claude-3.5-sonnet'
+        # Use Gemini 1.5 Pro - 2 Million Token Context (Infinite Memory)
+        self.default_model = 'google/gemini-pro-1.5'
         self.fallback_model = 'anthropic/claude-3-haiku'
     
     def _get_api_key(self):

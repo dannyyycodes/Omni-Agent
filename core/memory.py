@@ -124,7 +124,7 @@ class MemoryManager:
             })
             self._save_file_storage()
     
-    def get_context(self, project_id=None, limit=10):
+    def get_context(self, project_id=None, limit=1000):
         """Get recent context for a project"""
         if self.use_db and HAS_SQLALCHEMY:
             try:
