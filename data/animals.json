@@ -1,0 +1,304 @@
+{
+    "animals": [
+        {
+            "id": "penguin",
+            "name": "Emperor Penguin",
+            "habitat": "Antarctica",
+            "prompt_style": "waddling on ice"
+        },
+        {
+            "id": "elephant",
+            "name": "African Elephant",
+            "habitat": "Savanna",
+            "prompt_style": "walking through tall grass"
+        },
+        {
+            "id": "dolphin",
+            "name": "Bottlenose Dolphin",
+            "habitat": "Ocean",
+            "prompt_style": "jumping out of crystal clear water"
+        },
+        {
+            "id": "panda",
+            "name": "Giant Panda",
+            "habitat": "Bamboo Forest",
+            "prompt_style": "eating bamboo peacefully"
+        },
+        {
+            "id": "lion",
+            "name": "African Lion",
+            "habitat": "Savanna",
+            "prompt_style": "walking majestically at sunset"
+        },
+        {
+            "id": "owl",
+            "name": "Snowy Owl",
+            "habitat": "Arctic",
+            "prompt_style": "turning its head slowly"
+        },
+        {
+            "id": "koala",
+            "name": "Koala",
+            "habitat": "Australian Bush",
+            "prompt_style": "sleeping in a eucalyptus tree"
+        },
+        {
+            "id": "octopus",
+            "name": "Giant Pacific Octopus",
+            "habitat": "Deep Ocean",
+            "prompt_style": "changing colors underwater"
+        },
+        {
+            "id": "giraffe",
+            "name": "Giraffe",
+            "habitat": "African Plains",
+            "prompt_style": "reaching up to eat leaves"
+        },
+        {
+            "id": "fox",
+            "name": "Arctic Fox",
+            "habitat": "Arctic Tundra",
+            "prompt_style": "playing in fresh snow"
+        },
+        {
+            "id": "hummingbird",
+            "name": "Ruby-throated Hummingbird",
+            "habitat": "Garden",
+            "prompt_style": "hovering near a flower"
+        },
+        {
+            "id": "whale",
+            "name": "Humpback Whale",
+            "habitat": "Ocean",
+            "prompt_style": "breaching out of the water"
+        },
+        {
+            "id": "cheetah",
+            "name": "Cheetah",
+            "habitat": "African Savanna",
+            "prompt_style": "running at full speed"
+        },
+        {
+            "id": "sloth",
+            "name": "Three-toed Sloth",
+            "habitat": "Rainforest",
+            "prompt_style": "hanging from a branch slowly"
+        },
+        {
+            "id": "polar_bear",
+            "name": "Polar Bear",
+            "habitat": "Arctic",
+            "prompt_style": "walking on sea ice"
+        },
+        {
+            "id": "flamingo",
+            "name": "Greater Flamingo",
+            "habitat": "Wetlands",
+            "prompt_style": "standing on one leg in pink water"
+        },
+        {
+            "id": "tiger",
+            "name": "Bengal Tiger",
+            "habitat": "Jungle",
+            "prompt_style": "stalking through tall grass"
+        },
+        {
+            "id": "sea_turtle",
+            "name": "Green Sea Turtle",
+            "habitat": "Coral Reef",
+            "prompt_style": "swimming gracefully underwater"
+        },
+        {
+            "id": "red_panda",
+            "name": "Red Panda",
+            "habitat": "Himalayan Forest",
+            "prompt_style": "climbing a tree branch"
+        },
+        {
+            "id": "jellyfish",
+            "name": "Moon Jellyfish",
+            "habitat": "Ocean",
+            "prompt_style": "glowing and pulsing underwater"
+        },
+        {
+            "id": "hedgehog",
+            "name": "European Hedgehog",
+            "habitat": "Garden",
+            "prompt_style": "curling into a ball"
+        },
+        {
+            "id": "parrot",
+            "name": "Scarlet Macaw",
+            "habitat": "Rainforest",
+            "prompt_style": "flying through the canopy"
+        },
+        {
+            "id": "wolf",
+            "name": "Gray Wolf",
+            "habitat": "Forest",
+            "prompt_style": "howling at the moon"
+        },
+        {
+            "id": "manta_ray",
+            "name": "Giant Manta Ray",
+            "habitat": "Tropical Ocean",
+            "prompt_style": "gliding through blue water"
+        },
+        {
+            "id": "chameleon",
+            "name": "Panther Chameleon",
+            "habitat": "Madagascar",
+            "prompt_style": "changing colors on a branch"
+        },
+        {
+            "id": "capybara",
+            "name": "Capybara",
+            "habitat": "South American Wetlands",
+            "prompt_style": "relaxing in a hot spring"
+        },
+        {
+            "id": "peacock",
+            "name": "Indian Peacock",
+            "habitat": "Forest",
+            "prompt_style": "displaying its colorful feathers"
+        },
+        {
+            "id": "otter",
+            "name": "Sea Otter",
+            "habitat": "Pacific Coast",
+            "prompt_style": "floating on its back holding hands"
+        },
+        {
+            "id": "gorilla",
+            "name": "Mountain Gorilla",
+            "habitat": "African Mountains",
+            "prompt_style": "sitting peacefully in the mist"
+        },
+        {
+            "id": "kangaroo",
+            "name": "Red Kangaroo",
+            "habitat": "Australian Outback",
+            "prompt_style": "hopping across the desert"
+        },
+        {
+            "id": "axolotl",
+            "name": "Axolotl",
+            "habitat": "Mexican Lakes",
+            "prompt_style": "swimming with its feathery gills"
+        },
+        {
+            "id": "snow_leopard",
+            "name": "Snow Leopard",
+            "habitat": "Himalayan Mountains",
+            "prompt_style": "walking on a snowy cliff"
+        },
+        {
+            "id": "seahorse",
+            "name": "Pygmy Seahorse",
+            "habitat": "Coral Reef",
+            "prompt_style": "clinging to coral"
+        },
+        {
+            "id": "bear",
+            "name": "Grizzly Bear",
+            "habitat": "Forest River",
+            "prompt_style": "catching salmon in a waterfall"
+        },
+        {
+            "id": "butterfly",
+            "name": "Monarch Butterfly",
+            "habitat": "Meadow",
+            "prompt_style": "landing on a flower"
+        },
+        {
+            "id": "raccoon",
+            "name": "Raccoon",
+            "habitat": "Forest",
+            "prompt_style": "washing food in a stream"
+        },
+        {
+            "id": "seal",
+            "name": "Harbor Seal",
+            "habitat": "Rocky Coast",
+            "prompt_style": "sunbathing on rocks"
+        },
+        {
+            "id": "toucan",
+            "name": "Toco Toucan",
+            "habitat": "Rainforest",
+            "prompt_style": "catching fruit with its beak"
+        },
+        {
+            "id": "lemur",
+            "name": "Ring-tailed Lemur",
+            "habitat": "Madagascar",
+            "prompt_style": "leaping between trees"
+        },
+        {
+            "id": "hippo",
+            "name": "Hippopotamus",
+            "habitat": "African River",
+            "prompt_style": "emerging from the water"
+        },
+        {
+            "id": "firefly",
+            "name": "Firefly",
+            "habitat": "Night Meadow",
+            "prompt_style": "glowing in the dark forest"
+        },
+        {
+            "id": "kingfisher",
+            "name": "Common Kingfisher",
+            "habitat": "River",
+            "prompt_style": "diving into water to catch fish"
+        },
+        {
+            "id": "moose",
+            "name": "Moose",
+            "habitat": "Northern Forest",
+            "prompt_style": "standing in a misty lake"
+        },
+        {
+            "id": "platypus",
+            "name": "Platypus",
+            "habitat": "Australian River",
+            "prompt_style": "swimming underwater"
+        },
+        {
+            "id": "albatross",
+            "name": "Wandering Albatross",
+            "habitat": "Open Ocean",
+            "prompt_style": "gliding over waves"
+        },
+        {
+            "id": "bison",
+            "name": "American Bison",
+            "habitat": "Great Plains",
+            "prompt_style": "grazing in golden sunset light"
+        },
+        {
+            "id": "crocodile",
+            "name": "Saltwater Crocodile",
+            "habitat": "Tropical River",
+            "prompt_style": "lurking just below the surface"
+        },
+        {
+            "id": "deer",
+            "name": "White-tailed Deer",
+            "habitat": "Forest",
+            "prompt_style": "walking through morning fog"
+        },
+        {
+            "id": "frog",
+            "name": "Red-eyed Tree Frog",
+            "habitat": "Rainforest",
+            "prompt_style": "sitting on a wet leaf"
+        },
+        {
+            "id": "squirrel",
+            "name": "Red Squirrel",
+            "habitat": "Woodland",
+            "prompt_style": "gathering acorns"
+        }
+    ]
+}
