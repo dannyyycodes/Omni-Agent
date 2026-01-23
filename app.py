@@ -116,13 +116,19 @@ def index():
     social_stats = social_tracker.get_stats()
     
     # 2. Get Workflow Status
-    # Initialize workflows if not executing
-    active_workflows = 3 # Placeholder count
+    if 'workflow_engine' not in globals():
+        global workflow_engine
+        from workflows.engine import WorkflowEngine
+        workflow_engine = WorkflowEngine()
+        
+    # Get actual list
+    all_workflows = workflow_engine.list_all()
+    active_count = len([w for w in all_workflows if w.get('enabled')]) if all_workflows else 0
     
     return render_template('dashboard.html', 
                          page='dashboard', 
                          stats=social_stats,
-                         active_workflows=active_workflows)
+                         active_workflows=active_count)
 
 
 @app.route('/api/refresh-stats', methods=['POST'])
@@ -147,7 +153,7 @@ def chat(project_id=None):
 @app.route('/projects')
 def projects_page():
     """Projects management"""
-    return render_template('dashboard.html', page='projects')
+    return render_template('projects.html', page='projects')
 
 
 @app.route('/apis')
@@ -159,7 +165,13 @@ def apis_page():
 @app.route('/workflows')
 def workflows_page():
     """Workflows management"""
-    return render_template('dashboard.html', page='workflows')
+    if 'workflow_engine' not in globals():
+        global workflow_engine
+        from workflows.engine import WorkflowEngine
+        workflow_engine = WorkflowEngine()
+    
+    all_workflows = workflow_engine.list_all()
+    return render_template('workflows.html', page='workflows', workflows=all_workflows)
 
 
 @app.route('/memory')
