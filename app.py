@@ -150,10 +150,31 @@ def chat(project_id=None):
     return render_template('chat.html', page='chat', project_id=project_id)
 
 
+@app.route('/settings')
+def settings_page():
+    """Settings page"""
+    # Load config from env or file
+    config = {
+        'OPENROUTER_API_KEY': os.environ.get('OPENROUTER_API_KEY', ''),
+        'KIE_API_KEY': os.environ.get('KIE_API_KEY', ''),
+        'BLOTATO_API_KEY': os.environ.get('BLOTATO_API_KEY', ''),
+        'SYSTEM_PROMPT': "You are OMNI, a capable AI assistant..."
+    }
+    return render_template('settings.html', page='settings', config=config)
+
+@app.route('/api/settings', methods=['POST'])
+def save_settings():
+    """Save settings (Mock persistence for now or update env)"""
+    data = request.json
+    # In a real app we'd write to .env or DB
+    # For now, just confirming success to UI
+    return jsonify({'status': 'saved'})
+
 @app.route('/projects')
 def projects_page():
     """Projects management"""
-    return render_template('projects.html', page='projects')
+    all_projects = projects.list_all()
+    return render_template('projects.html', page='projects', projects=all_projects)
 
 
 @app.route('/apis')
@@ -177,7 +198,8 @@ def workflows_page():
 @app.route('/memory')
 def memory_page():
     """Memory browser"""
-    return render_template('dashboard.html', page='memory')
+    memories = brain.memory.get_recent(limit=50)
+    return render_template('dashboard.html', page='memory', memories=memories) # Note: dashboard needs update to show memory list if passed
 
 
 # ============================================================

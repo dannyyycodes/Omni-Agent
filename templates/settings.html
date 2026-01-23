@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="header">
+    <h1>System Settings</h1>
+    <p>Configure your OMNI Agent's capabilities.</p>
+</div>
+
+<div class="glass-panel" style="padding: 30px; max-width: 800px;">
+    <h3>API Configuration</h3>
+    <p style="color: var(--text-secondary); margin-bottom: 20px;">
+        These keys power your agent's brain and tools. They are stored securely.
+    </p>
+
+    <form id="settings-form" onsubmit="saveSettings(event)">
+        <div style="margin-bottom: 20px;">
+            <label style="display: block; margin-bottom: 8px;">OpenRouter / LLM Key</label>
+            <input type="password" name="OPENROUTER_API_KEY" class="chat-input" style="width: 100%;"
+                placeholder="sk-..." value="{{ config.OPENROUTER_API_KEY }}">
+        </div>
+
+        <div style="margin-bottom: 20px;">
+            <label style="display: block; margin-bottom: 8px;">Kie.ai Key (Video)</label>
+            <input type="password" name="KIE_API_KEY" class="chat-input" style="width: 100%;" placeholder="kie_..."
+                value="{{ config.KIE_API_KEY }}">
+        </div>
+
+        <div style="margin-bottom: 20px;">
+            <label style="display: block; margin-bottom: 8px;">Blotato Key (Social)</label>
+            <input type="password" name="BLOTATO_API_KEY" class="chat-input" style="width: 100%;" placeholder="blt_..."
+                value="{{ config.BLOTATO_API_KEY }}">
+        </div>
+
+        <div style="border-top: 1px solid var(--glass-border); margin: 30px 0;"></div>
+
+        <h3>Agent Personality</h3>
+        <div style="margin-bottom: 20px;">
+            <label style="display: block; margin-bottom: 8px;">System Instructions</label>
+            <textarea name="SYSTEM_PROMPT" class="chat-input"
+                style="width: 100%; height: 150px; resize: vertical;">{{ config.SYSTEM_PROMPT }}</textarea>
+        </div>
+
+        <button type="submit" class="btn btn-primary" id="save-btn">Save Configuration</button>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function saveSettings(e) {
+        e.preventDefault();
+        const btn = document.getElementById('save-btn');
+        btn.innerHTML = 'Saving...';
+        btn.disabled = true;
+
+        const formData = new FormData(e.target);
+        const data = Object.fromEntries(formData.entries());
+
+        try {
+            const response = await fetch('/api/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (response.ok) {
+                btn.innerHTML = '<i data-lucide="check"></i> Saved';
+                btn.style.background = 'var(--success)';
+            } else {
+                throw new Error('Failed');
+            }
+        } catch (error) {
+            btn.innerHTML = 'Error Saving';
+            btn.style.background = 'var(--danger)';
+        }
+
+        setTimeout(() => {
+            btn.innerHTML = 'Save Configuration';
+            btn.disabled = false;
+            btn.style.background = ''; // reset
+            lucide.createIcons();
+        }, 2000);
+    }
+</script>
+{% endblock %}

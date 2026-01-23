@@ -3,30 +3,74 @@
 {% block content %}
 <div class="header">
     <h1>Projects</h1>
-    <p>Organize your work and memories.</p>
+    <p>Organize your work into separate workspaces.</p>
 </div>
 
 <div class="stats-grid">
+    <!-- Create New Card -->
     <div class="stat-card glass-panel"
-        style="border-style: dashed; display: flex; align-items: center; justify-content: center; cursor: pointer;"
-        onclick="window.location.href='/chat?msg=Create a new project'">
+        style="border-style: dashed; display: flex; align-items: center; justify-content: center; cursor: pointer; min-height: 200px;"
+        onclick="createNewProject()">
         <div style="text-align: center;">
-            <i data-lucide="plus" size="32" style="margin-bottom: 10px; color: var(--accent-primary);"></i>
-            <div>New Project</div>
+            <i data-lucide="plus" size="48" style="margin-bottom: 10px; color: var(--accent-primary);"></i>
+            <div style="font-weight: 600;">New Project</div>
         </div>
     </div>
 
-    <!-- Example Project Card -->
-    <div class="stat-card glass-panel">
-        <div class="stat-label">Project</div>
-        <div class="stat-value" style="font-size: 1.5rem;">Sora Automations</div>
-        <p style="color: var(--text-secondary); margin-top: 10px; font-size: 0.9rem;">
-            Contains Video Generator logic.
+    {% for p in projects %}
+    <div class="stat-card glass-panel" style="min-height: 200px; display: flex; flex-direction: column;">
+        <div style="font-size: 2rem; margin-bottom: 15px;">{{ p.icon }}</div>
+        <div class="stat-value" style="font-size: 1.2rem; margin: 0;">{{ p.name }}</div>
+        <p style="color: var(--text-secondary); margin-top: 10px; font-size: 0.9rem; flex-grow: 1;">
+            {{ p.description or 'No description' }}
         </p>
-        <button class="btn" style="margin-top: 20px; width: 100%; background: rgba(255,255,255,0.05);"
-            onclick="window.location.href='/chat?project_id=sora'">
-            Open Chat
-        </button>
+        <div style="margin-top: 20px; display: flex; gap: 10px;">
+            <button class="btn" style="flex: 1; background: rgba(255,255,255,0.1);"
+                onclick="window.location.href='/chat?project_id={{ p.id }}'">
+                Open Chat
+            </button>
+            <button class="btn" style="padding: 0 15px;" onclick="deleteProject('{{ p.id }}')">
+                <i data-lucide="trash-2" size="16"></i>
+            </button>
+        </div>
     </div>
+    {% endfor %}
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function createNewProject() {
+        const name = prompt("Name your new project:");
+        if (!name) return;
+
+        try {
+            const response = await fetch('/api/projects', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: name, description: 'Created via Dashboard' })
+            });
+            if (response.ok) {
+                window.location.reload();
+            }
+        } catch (e) {
+            alert("Error creating project");
+        }
+    }
+
+    async function deleteProject(id) {
+        if (!confirm("Delete this project?")) return;
+
+        try {
+            const response = await fetch('/api/projects/' + id, {
+                method: 'DELETE'
+            });
+            if (response.ok) {
+                window.location.reload();
+            }
+        } catch (e) {
+            alert("Error deleting project");
+        }
+    }
+</script>
 {% endblock %}
