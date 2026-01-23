@@ -1,0 +1,257 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="header">
+    <h1><i data-lucide="kanban"></i> Pipeline Command Center</h1>
+    <p>Live visualization of Autonomous Automations.</p>
+</div>
+
+<!-- Stats Ticker -->
+<div class="stats-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom: 25px;">
+    <div class="stat-card glass-panel compact">
+        <div class="stat-label">Idea Bank</div>
+        <div class="stat-value">{{ pipeline.ideas|length if pipeline else 0 }}</div>
+    </div>
+    <div class="stat-card glass-panel compact">
+        <div class="stat-label">In Progress</div>
+        <div class="stat-value" style="color: var(--accent);">{{ pipeline.in_progress|length if pipeline else 0 }}</div>
+    </div>
+    <div class="stat-card glass-panel compact">
+        <div class="stat-label">Needs Review</div>
+        <div class="stat-value" style="color: var(--warning);">{{ pipeline.review|length if pipeline else 0 }}</div>
+    </div>
+    <div class="stat-card glass-panel compact">
+        <div class="stat-label">Published (Today)</div>
+        <div class="stat-value" style="color: var(--success);">{{ pipeline.published|length if pipeline else 0 }}</div>
+    </div>
+</div>
+
+<!-- Kanban Board -->
+<div class="pipeline-board">
+    <!-- col 1: Idea Bank -->
+    <div class="pipeline-col">
+        <div class="col-header">
+            <span class="dot" style="background: #888;"></span> Idea Bank
+        </div>
+        <div class="col-content">
+            {% for item in pipeline.ideas %}
+            <div class="kanban-card">
+                <div class="card-tag">{{ item.source }}</div>
+                <div class="card-title">{{ item.title }}</div>
+                <div class="card-meta">Added: {{ item.date }}</div>
+            </div>
+            {% else %}
+            <div class="empty-state">No ideas yet. Ask Omni to "Brainstorm".</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- col 2: Planning/Production -->
+    <div class="pipeline-col">
+        <div class="col-header">
+            <span class="dot" style="background: var(--accent);"></span> In Production
+        </div>
+        <div class="col-content">
+            {% for item in pipeline.in_progress %}
+            <div class="kanban-card active-card">
+                <div class="card-tag">{{ item.type }}</div>
+                <div class="card-title">{{ item.title }}</div>
+                <div class="progress-bar">
+                    <div class="fill" style="width: {{ item.progress }}%;"></div>
+                </div>
+                <div class="card-meta"><i data-lucide="loader-2" class="spin"></i> {{ item.status }}</div>
+            </div>
+            {% else %}
+            <div class="empty-state">Agent is idle.</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- col 3: Review -->
+    <div class="pipeline-col">
+        <div class="col-header">
+            <span class="dot" style="background: var(--warning);"></span> Approval Needed
+        </div>
+        <div class="col-content">
+            {% for item in pipeline.review %}
+            <div class="kanban-card review-card">
+                <div class="card-tag">{{ item.type }}</div>
+                <div class="card-title">{{ item.title }}</div>
+                <div class="card-actions">
+                    <button class="btn-xs approve">Approve</button>
+                    <button class="btn-xs reject">Edit</button>
+                </div>
+            </div>
+            {% else %}
+            <div class="empty-state">Nothing to review.</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- col 4: Live -->
+    <div class="pipeline-col">
+        <div class="col-header">
+            <span class="dot" style="background: var(--success);"></span> Live / Posted
+        </div>
+        <div class="col-content">
+            {% for item in pipeline.published %}
+            <div class="kanban-card">
+                <div class="card-tag success">Live</div>
+                <div class="card-title">{{ item.title }}</div>
+                <div class="card-meta">
+                    <i data-lucide="eye" size="12"></i> {{ item.views }} views
+                </div>
+            </div>
+            {% else %}
+            <div class="empty-state">No posts yet.</div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<style>
+    .pipeline-board {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 15px;
+        height: 60vh;
+    }
+
+    .pipeline-col {
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 12px;
+        padding: 15px;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .col-header {
+        font-weight: 600;
+        margin-bottom: 15px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 0.05em;
+    }
+
+    .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        display: block;
+    }
+
+    .kanban-card {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--glass-border);
+        border-radius: 8px;
+        padding: 12px;
+        margin-bottom: 10px;
+        transition: transform 0.2s;
+    }
+
+    .kanban-card:hover {
+        transform: translateY(-2px);
+        border-color: rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.08);
+    }
+
+    .card-tag {
+        font-size: 0.7rem;
+        background: rgba(255, 255, 255, 0.1);
+        padding: 2px 6px;
+        border-radius: 4px;
+        display: inline-block;
+        margin-bottom: 6px;
+    }
+
+    .card-title {
+        font-weight: 500;
+        font-size: 0.9rem;
+        margin-bottom: 8px;
+        line-height: 1.3;
+    }
+
+    .card-meta {
+        font-size: 0.75rem;
+        color: var(--text-tertiary);
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .active-card {
+        border-left: 2px solid var(--accent);
+    }
+
+    .review-card {
+        border-left: 2px solid var(--warning);
+    }
+
+    .progress-bar {
+        height: 4px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 2px;
+        margin-bottom: 8px;
+        overflow: hidden;
+    }
+
+    .fill {
+        height: 100%;
+        background: var(--accent);
+    }
+
+    .card-actions {
+        display: flex;
+        gap: 5px;
+        margin-top: 8px;
+    }
+
+    .btn-xs {
+        border: none;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 0.7rem;
+        cursor: pointer;
+        flex: 1;
+    }
+
+    .approve {
+        background: rgba(0, 255, 135, 0.2);
+        color: var(--success);
+    }
+
+    .reject {
+        background: rgba(255, 255, 255, 0.1);
+        color: var(--text-secondary);
+    }
+
+    .empty-state {
+        text-align: center;
+        color: var(--text-tertiary);
+        font-size: 0.8rem;
+        padding: 20px 0;
+        font-style: italic;
+    }
+
+    .spin {
+        animation: spin 2s linear infinite;
+    }
+
+    @keyframes spin {
+        100% {
+            transform: rotate(360deg);
+        }
+    }
+
+    @media (max-width: 900px) {
+        .pipeline-board {
+            grid-template-columns: 1fr;
+            height: auto;
+        }
+    }
+</style>
+{% endblock %}
