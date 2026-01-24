@@ -245,78 +245,101 @@ This must look 100% real - not CGI, not animated, not stylized. Pure photorealis
         # Map duration to n_frames format
         n_frames = "10s" if duration <= 10 else "15s"
         
-        # Try multiple payload variations to find the correct one
+        # Try variations focusing on the "input" structure which showed promise
         payloads = [
-            # Attempt 1: Standard flat with n_frames (most documentation matches this)
+            # Attempt 1: Nested 'input' with n_frames string (The one that bypassed 422)
             {
-                "model": "sora-2-text-to-video",
-                "prompt": prompt,
-                "aspect_ratio": "9:16",
-                "n_frames": n_frames,
-                "size": "standard"
-            },
-            # Attempt 2: Maybe 'duration' instead of n_frames?
-            {
-                "model": "sora-2-text-to-video",
-                "prompt": prompt,
-                "aspect_ratio": "9:16",
-                "duration": duration
-            },
-            # Attempt 3: Nested in 'input' key (common pattern for "Input cannot be null")
-            {
-                "model": "sora-2-text-to-video",
-                "input": {
-                    "prompt": prompt,
-                    "aspect_ratio": "9:16",
-                    "n_frames": n_frames
+                "name": "Nested Input (n_frames)",
+                "data": {
+                    "model": "sora-2-text-to-video",
+                    "input": {
+                        "prompt": prompt,
+                        "aspect_ratio": "9:16",
+                        "n_frames": n_frames
+                    }
                 }
             },
-            # Attempt 4: 'text' instead of 'prompt'
+            # Attempt 2: Nested 'input' with duration int
             {
-                "model": "sora-2-text-to-video",
-                "text": prompt,
-                "aspect_ratio": "9:16",
-                "n_frames": n_frames
+                "name": "Nested Input (duration int)",
+                "data": {
+                    "model": "sora-2-text-to-video",
+                    "input": {
+                        "prompt": prompt,
+                        "aspect_ratio": "9:16",
+                        "duration": duration
+                    }
+                }
+            },
+            # Attempt 3: Nested 'input' using 'text' instead of prompt
+            {
+                "name": "Nested Input (text key)",
+                "data": {
+                    "model": "sora-2-text-to-video",
+                    "input": {
+                        "text": prompt,
+                        "aspect_ratio": "9:16",
+                        "n_frames": n_frames
+                    }
+                }
+            },
+             # Attempt 4: Flat but wrapped in 'parameters' (another common pattern)
+            {
+                "name": "Parameters Wrapper",
+                "data": {
+                    "model": "sora-2-text-to-video",
+                    "parameters": {
+                        "prompt": prompt,
+                        "aspect_ratio": "9:16",
+                        "n_frames": n_frames
+                    }
+                }
             }
         ]
         
         errors = []
         
-        for i, payload in enumerate(payloads):
-            print(f"🎥 Kie.ai attempt {i+1} Request: {payload.keys()}")
+        for i, p in enumerate(payloads):
+            print(f"🎥 Kie.ai attempt {i+1} ({p['name']})")
             
             try:
                 resp = requests.post(
                     "https://api.kie.ai/api/v1/jobs/createTask",
                     headers=headers,
-                    json=payload,
+                    json=p['data'],
                     timeout=60
                 )
                 
                 print(f"🎥 Kie.ai response status: {resp.status_code}")
+                print(f"🎥 Kie.ai response body: {resp.text}")
                 
                 if resp.status_code == 200:
                     data = resp.json()
-                    # Check for logical error in 200 OK body
-                    if data.get('code') == 422:
-                        print(f"🎥 Attempt {i+1} failed (422): {data.get('msg')}")
-                        errors.append(f"Attempt {i+1}: {data.get('msg')}")
-                        continue
-                        
-                    task_id = data.get('data', {}).get('taskId') or data.get('taskId') or data.get('task_id')
+                    
+                    # Safer parsing logic
+                    # Check for explicit error code
+                    if data.get('code') and data.get('code') != 0 and data.get('code') != 200:
+                         print(f"🎥 Failed with code {data.get('code')}: {data.get('msg')}")
+                         errors.append(f"{p['name']}: {data.get('msg')}")
+                         continue
+
+                    # Try to extract task ID from various locations
+                    # Handle case where data.get('data') is None
+                    inner_data = data.get('data') or {}
+                    task_id = inner_data.get('taskId') or inner_data.get('task_id') or data.get('taskId') or data.get('task_id')
+                    
                     if task_id:
                         print(f"🎥 Success! Task created: {task_id}")
                         return task_id
                 
-                print(f"🎥 Kie.ai response body: {resp.text}")
-                errors.append(f"Attempt {i+1}: {resp.text}")
+                errors.append(f"{p['name']}: {resp.text}")
                 
             except Exception as e:
                 print(f"🎥 Attempt {i+1} error: {e}")
-                errors.append(str(e))
+                errors.append(f"{p['name']} error: {str(e)}")
                 
         # If all failed
-        raise Exception(f"All Kie.ai attempts failed. Errors: {'; '.join(errors)}")
+        raise Exception(f"All Kie.ai attempts failed. Details: {'; '.join(errors)}")
     
     def _kie_poll(self, key, task_id, max_wait=180):
         """Poll for video completion - increased timeout for Sora 2"""
