@@ -14,10 +14,13 @@ lxml==4.9.3
 
 # Scheduling
 croniter==2.0.1
+APScheduler==3.10.4
 
 # File handling
 python-magic==0.4.27
+Pillow==10.1.0
 
 # Optional but recommended
 redis==5.0.1
 celery==5.3.4
+

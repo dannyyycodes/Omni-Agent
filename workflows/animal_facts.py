@@ -33,18 +33,29 @@ class AnimalFactsWorkflow:
                 {"id": "elephant", "name": "African Elephant", "prompt_style": "walking through tall grass"}
             ]
     
-    def run(self, animal_id=None):
-        """Execute the full workflow"""
-        print("🎬 Starting Animal Facts V2 Workflow...")
+    def run(self, animal_id=None, dry_run=False, duration=10):
+        """
+        Execute the full workflow.
         
-        # 1. Pick an Animal
+        Args:
+            animal_id: Optional specific animal to use
+            dry_run: If True, generate video but skip posting to socials
+            duration: Video length in seconds (5, 10, 15, or 20)
+        """
+        print("🎬 Starting Animal Facts V2 Workflow...")
+        if dry_run:
+            print("🧪 DRY RUN MODE - Video will be generated but NOT posted")
+        
+        # 1. Pick an Animal - DYNAMICALLY via AI (unlimited variety!)
         if animal_id:
-            animal = next((a for a in self.animals if a['id'] == animal_id), None)
+            # User requested specific animal
+            animal = {'id': animal_id, 'name': animal_id.title(), 'prompt_style': 'in its natural habitat'}
         else:
-            animal = random.choice(self.animals)
+            # Generate a random interesting animal via AI
+            animal = self._generate_random_animal()
         
         if not animal:
-            return {"error": f"Animal '{animal_id}' not found"}
+            return {"error": "Failed to generate animal"}
             
         print(f"🐾 Selected: {animal['name']}")
         
@@ -53,8 +64,8 @@ class AnimalFactsWorkflow:
         fact = self._generate_fact(animal)
         print(f"📝 Fact: {fact[:60]}...")
         
-        # 3. Generate Sora Prompt
-        sora_prompt = self._build_sora_prompt(animal)
+        # 3. Generate Sora Prompt (with duration)
+        sora_prompt = self._build_sora_prompt(animal, duration=duration)
         print(f"🎨 Sora Prompt: {sora_prompt[:50]}...")
         
         # 4. Generate Video via Kie.ai
@@ -62,9 +73,9 @@ class AnimalFactsWorkflow:
         if not kie_key:
             return {"error": "Missing KIE_API_KEY", "fact": fact, "animal": animal['name']}
         
-        print("🎥 Calling Kie.ai (Sora 2)...")
+        print(f"🎥 Calling Kie.ai (Sora 2) - {duration}s video...")
         try:
-            task_id = self._kie_generate(kie_key, sora_prompt)
+            task_id = self._kie_generate(kie_key, sora_prompt, duration=duration)
             video_url = self._kie_poll(kie_key, task_id)
         except Exception as e:
             return {"error": f"Video generation failed: {str(e)}", "fact": fact}
@@ -80,7 +91,18 @@ class AnimalFactsWorkflow:
             final_video = video_url
             print(f"⚠️ Composition failed, using raw video: {e}")
         
-        # 6. Post to Blotato
+        # 6. Post to Blotato (skip if dry_run)
+        if dry_run:
+            return {
+                "status": "dry_run_success",
+                "animal": animal['name'],
+                "fact": fact,
+                "video": final_video,
+                "sora_prompt": sora_prompt,
+                "duration": duration,
+                "message": "🧪 DRY RUN: Video generated successfully! Not posted to socials."
+            }
+        
         blotato_key = os.environ.get('BLOTATO_API_KEY')
         caption = f"🐾 Did you know? {fact[:100]}... #animals #facts #wildlife #nature"
         
@@ -141,25 +163,91 @@ Example: "Did you know that emperor penguins can hold their breath for up to 20 
             }
             return fallbacks.get(animal['id'], f"Did you know {animal['name']}s are amazing creatures?")
     
-    def _build_sora_prompt(self, animal):
-        """Build the Sora 2 video generation prompt"""
-        return f"""Hyper-realistic cinematic video of a {animal['name']} {animal.get('prompt_style', 'in its natural habitat')}.
+    def _generate_random_animal(self):
+        """Use AI to generate a random interesting animal - unlimited variety!"""
+        prompt = """Pick ONE random animal that would make a visually stunning short video.
         
-Style: 8K resolution, shallow depth of field, golden hour lighting, National Geographic quality.
-Movement: Slow, graceful motion. The animal should be the clear focus.
-Duration: 5 seconds.
-Aspect ratio: 9:16 (vertical for shorts)."""
+Requirements:
+- Choose something interesting and visually appealing
+- Can be common (lion, dolphin) or exotic (axolotl, pangolin)
+- Avoid repeating the same animals - be creative!
+- The animal should have interesting visual behaviors
+
+Return ONLY a JSON object like this:
+{"name": "Snow Leopard", "prompt_style": "stalking through snowy mountains"}
+
+The prompt_style should describe a cinematic action the animal does."""
+        
+        try:
+            result = self.model_router.complete(
+                prompt,
+                system="Return only valid JSON, nothing else.",
+                max_tokens=100
+            )
+            
+            # Parse the JSON
+            import re
+            match = re.search(r'\{.*\}', result, re.DOTALL)
+            if match:
+                data = json.loads(match.group())
+                return {
+                    'id': data['name'].lower().replace(' ', '_'),
+                    'name': data['name'],
+                    'prompt_style': data.get('prompt_style', 'in its natural habitat')
+                }
+        except Exception as e:
+            print(f"Failed to generate animal: {e}")
+        
+        # Fallback to a random interesting animal
+        fallbacks = [
+            {'id': 'arctic_fox', 'name': 'Arctic Fox', 'prompt_style': 'playing in fresh snow'},
+            {'id': 'octopus', 'name': 'Giant Pacific Octopus', 'prompt_style': 'changing colors'},
+            {'id': 'hummingbird', 'name': 'Ruby-throated Hummingbird', 'prompt_style': 'hovering near flowers'},
+            {'id': 'red_panda', 'name': 'Red Panda', 'prompt_style': 'climbing bamboo trees'},
+            {'id': 'mantis_shrimp', 'name': 'Mantis Shrimp', 'prompt_style': 'swimming in coral reef'},
+        ]
+        return random.choice(fallbacks)
+
     
-    def _kie_generate(self, key, prompt):
-        """Generate video via Kie.ai"""
+    def _build_sora_prompt(self, animal, duration=10):
+        """Build the Sora 2 video generation prompt - HYPER-REALISTIC for maximum virality"""
+        
+        # Ultra-realistic cinematic styles
+        styles = [
+            "shot on ARRI Alexa 65, anamorphic lens flare, dramatic slow motion, golden hour rim lighting",
+            "extreme close-up wildlife photography, Canon EOS R5, 800mm telephoto lens, creamy bokeh",
+            "David Attenborough BBC documentary style, aerial drone tracking shot, epic landscape",
+            "intimate National Geographic portrait, shallow depth of field, piercing eye contact",
+            "Planet Earth II cinematography, 8K RED camera, professional color grade, atmospheric fog"
+        ]
+        
+        style = random.choice(styles)
+        action = animal.get('prompt_style', 'in its natural habitat')
+        
+        return f"""HYPER-REALISTIC wildlife footage of a real {animal['name']} {action}.
+
+CINEMATOGRAPHY: {style}
+REALISM: Photorealistic, indistinguishable from real BBC/National Geographic footage. Real fur texture, authentic muscle movement, natural breathing, lifelike eyes with reflections.
+QUALITY: 8K resolution, RAW cinema quality, razor sharp focus on subject, professional wildlife documentary grade.
+LIGHTING: Cinematic natural lighting, volumetric rays, realistic shadows.
+MOVEMENT: Ultra-smooth slow motion, {duration} seconds of continuous fluid motion.
+ASPECT: 9:16 vertical (TikTok/Reels/Shorts optimized).
+
+This must look 100% real - not CGI, not animated, not stylized. Pure photorealistic wildlife footage that could air on BBC Earth."""
+    
+    def _kie_generate(self, key, prompt, duration=10):
+        """Generate video via Kie.ai with configurable duration"""
         headers = {"Authorization": f"Bearer {key}"}
+        
+        # Kie.ai supports different durations
         resp = requests.post(
             "https://api.kie.ai/api/v1/jobs/createTask",
             headers=headers,
             json={
                 "model": "sora-2-text-to-video",
                 "prompt": prompt,
-                "aspect_ratio": "9:16"
+                "aspect_ratio": "9:16",
+                "duration": duration  # 5, 10, 15, or 20 seconds
             },
             timeout=60
         )
@@ -223,8 +311,12 @@ Aspect ratio: 9:16 (vertical for shorts)."""
         return resp.json()
 
     def preview(self, animal_id=None):
-        """Generate a preview without actually calling APIs (for testing)"""
-        animal = next((a for a in self.animals if a['id'] == animal_id), None) if animal_id else random.choice(self.animals)
+        """Generate a preview without actually calling video APIs (saves credits)"""
+        # Use dynamic generation just like run()
+        if animal_id:
+            animal = {'id': animal_id, 'name': animal_id.title(), 'prompt_style': 'in its natural habitat'}
+        else:
+            animal = self._generate_random_animal()
         
         fact = self._generate_fact(animal)
         prompt = self._build_sora_prompt(animal)
@@ -236,3 +328,31 @@ Aspect ratio: 9:16 (vertical for shorts)."""
             "sora_prompt": prompt,
             "message": "Preview generated. Use run() to execute the full workflow."
         }
+    
+    def visual_preview(self, animal_id=None):
+        """Generate a visual mockup image showing the video layout"""
+        from utils.video_composer import create_preview_image
+        
+        # Generate animal and fact
+        if animal_id:
+            animal = {'id': animal_id, 'name': animal_id.title(), 'prompt_style': 'in its natural habitat'}
+        else:
+            animal = self._generate_random_animal()
+        
+        fact = self._generate_fact(animal)
+        
+        # Create preview image
+        output_dir = os.environ.get('VIDEO_OUTPUT_DIR', '/tmp/omni_videos')
+        os.makedirs(output_dir, exist_ok=True)
+        
+        preview_path = os.path.join(output_dir, f"preview_{animal['id']}.png")
+        create_preview_image(fact, animal['name'], preview_path)
+        
+        return {
+            "status": "visual_preview",
+            "animal": animal['name'],
+            "fact": fact,
+            "preview_image": preview_path,
+            "message": "Visual mockup created. This shows what the final video frame will look like."
+        }
+

@@ -26,6 +26,7 @@ from api.model_router import ModelRouter
 from workflows.engine import WorkflowEngine
 from web_agent.browser import WebAgent
 from storage.files import FileManager
+from core.scheduler import init_scheduler, get_scheduler
 
 # ============================================================
 # FLASK APP SETUP
@@ -52,6 +53,7 @@ workflows = None
 web_agent = None
 files = None
 self_updater = None
+workflow_scheduler = None
 
 
 def get_db_url():
@@ -89,6 +91,10 @@ def init_omni():
         files=files,
         self_updater=self_updater
     )
+    
+    # Initialize workflow scheduler
+    global workflow_scheduler
+    workflow_scheduler = init_scheduler(api_hub, model_router)
     
     print("✅ OMNI initialized successfully")
 
@@ -544,6 +550,175 @@ def api_self_update():
             files_to_modify=data.get('files')
         )
         return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# ============================================================
+# ANIMAL FACTS WORKFLOW ENDPOINTS
+# ============================================================
+
+@app.route('/api/animal-facts/run', methods=['POST'])
+def api_animal_facts_run():
+    """
+    Run the Animal Facts workflow directly.
+    
+    Body params:
+        animal_id: Optional specific animal (e.g., "snow leopard")
+        dry_run: If true, generate video but don't post to socials (default: false)
+        duration: Video length in seconds - 5, 10, 15, or 20 (default: 10)
+    """
+    try:
+        from workflows.animal_facts import AnimalFactsWorkflow
+        
+        data = request.json or {}
+        animal_id = data.get('animal_id')
+        dry_run = data.get('dry_run', False)
+        duration = int(data.get('duration', 10))
+        
+        # Validate duration
+        if duration not in [5, 10, 15, 20]:
+            duration = 10
+        
+        # Check for API key
+        if not os.environ.get('KIE_API_KEY'):
+            return jsonify({
+                'error': 'Missing KIE_API_KEY',
+                'message': 'Please add your Kie.ai API key in Settings'
+            }), 400
+        
+        workflow = AnimalFactsWorkflow(api_hub, model_router)
+        result = workflow.run(animal_id, dry_run=dry_run, duration=duration)
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/animal-facts/preview', methods=['POST'])
+def api_animal_facts_preview():
+    """Preview the Animal Facts workflow (no API credits spent)"""
+    try:
+        from workflows.animal_facts import AnimalFactsWorkflow
+        
+        data = request.json or {}
+        animal_id = data.get('animal_id')
+        
+        workflow = AnimalFactsWorkflow(api_hub, model_router)
+        result = workflow.preview(animal_id)
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/animal-facts/visual-preview', methods=['POST'])
+def api_animal_facts_visual_preview():
+    """Generate a visual mockup image showing video layout"""
+    try:
+        from workflows.animal_facts import AnimalFactsWorkflow
+        from flask import send_file
+        
+        data = request.json or {}
+        animal_id = data.get('animal_id')
+        
+        workflow = AnimalFactsWorkflow(api_hub, model_router)
+        result = workflow.visual_preview(animal_id)
+        
+        # Return the preview image if it exists
+        if result.get('preview_image') and os.path.exists(result['preview_image']):
+            return send_file(
+                result['preview_image'],
+                mimetype='image/png',
+                as_attachment=False
+            )
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/animal-facts/animals', methods=['GET'])
+def api_animal_facts_list():
+    """List available animals for the Animal Facts workflow"""
+    try:
+        animals_path = os.path.join(os.path.dirname(__file__), 'data', 'animals.json')
+        if os.path.exists(animals_path):
+            with open(animals_path, 'r') as f:
+                data = json.load(f)
+                return jsonify({'animals': data.get('animals', [])})
+        else:
+            return jsonify({'animals': []})
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# ============================================================
+# SCHEDULER ENDPOINTS
+# ============================================================
+
+@app.route('/api/scheduler/schedules', methods=['GET'])
+def api_scheduler_list():
+    """List all scheduled workflows"""
+    try:
+        schedules = workflow_scheduler.get_schedules()
+        return jsonify({'schedules': schedules})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/scheduler/schedules', methods=['POST'])
+def api_scheduler_create():
+    """Create or update a scheduled workflow"""
+    try:
+        data = request.json or {}
+        workflow_type = data.get('workflow_type', 'animal_facts')
+        interval_hours = data.get('interval_hours', 4)
+        enabled = data.get('enabled', True)
+        
+        if workflow_type == 'animal_facts':
+            result = workflow_scheduler.schedule_animal_facts(
+                interval_hours=interval_hours,
+                enabled=enabled
+            )
+            return jsonify({
+                'success': True,
+                'schedule': result,
+                'posts_per_day': 24 // interval_hours,
+                'message': f'Animal Facts scheduled every {interval_hours} hours ({24 // interval_hours} posts/day)'
+            })
+        else:
+            return jsonify({'error': f'Unknown workflow type: {workflow_type}'}), 400
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/scheduler/schedules/<schedule_id>/toggle', methods=['POST'])
+def api_scheduler_toggle(schedule_id):
+    """Enable or disable a scheduled workflow"""
+    try:
+        data = request.json or {}
+        enabled = data.get('enabled')  # None means toggle
+        
+        result = workflow_scheduler.toggle_schedule(schedule_id, enabled)
+        return jsonify(result)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/scheduler/logs', methods=['GET'])
+def api_scheduler_logs():
+    """Get recent scheduler execution logs"""
+    try:
+        limit = int(request.args.get('limit', 20))
+        logs = workflow_scheduler.get_logs(limit)
+        return jsonify({'logs': logs})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
