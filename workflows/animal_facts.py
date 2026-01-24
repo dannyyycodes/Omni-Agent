@@ -263,9 +263,11 @@ This must look 100% real - not CGI, not animated, not stylized. Pure photorealis
         )
         
         print(f"🎥 Kie.ai response status: {resp.status_code}")
+        print(f"🎥 Kie.ai response body: {resp.text}")
         
         if resp.status_code != 200:
-            raise Exception(f"Kie.ai API error {resp.status_code}: {resp.text}")
+            # Return the full error response so we can debug it
+            raise Exception(f"Kie.ai error ({resp.status_code}): {resp.text}")
         
         data = resp.json()
         task_id = data.get('data', {}).get('taskId') or data.get('taskId') or data.get('task_id')
