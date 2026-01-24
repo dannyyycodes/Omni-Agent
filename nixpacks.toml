@@ -1,5 +1,0 @@
-# Nixpacks configuration for Railway deployment
-# Only adds extra system packages - lets Railway auto-detect Python
-
-[phases.setup]
-nixPkgs = ["ffmpeg", "dejavu_fonts", "file"]
