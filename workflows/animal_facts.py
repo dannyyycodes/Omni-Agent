@@ -242,56 +242,48 @@ This must look 100% real - not CGI, not animated, not stylized. Pure photorealis
             "Content-Type": "application/json"
         }
         
-        # We found the working structure (Nested Input) and Ratio (portrait)!
-        # Now finding the correct n_frames value.
-        frames_options = [10, "10", 5, "5", "10s", 15, "15"]
+        # Confirmed working parameters:
+        # - Structure: Nested "input" object
+        # - Aspect Ratio: "portrait"
+        # - n_frames: "10" or "15" (Must be string, no 's' suffix)
         
-        errors = []
+        n_frames = "10" if duration <= 10 else "15"
         
-        for frames in frames_options:
-            print(f"🎥 Kie.ai attempt (Ratio: portrait, Frames: {frames})")
-            
-            payload = {
-                "model": "sora-2-text-to-video",
-                "input": {
-                    "prompt": prompt,
-                    "aspect_ratio": "portrait",
-                    "n_frames": frames
-                }
+        payload = {
+            "model": "sora-2-text-to-video",
+            "input": {
+                "prompt": prompt,
+                "aspect_ratio": "portrait",
+                "n_frames": n_frames
             }
+        }
+        
+        print(f"🎥 Kie.ai request: model={payload['model']}, frames={n_frames}")
+        
+        resp = requests.post(
+            "https://api.kie.ai/api/v1/jobs/createTask",
+            headers=headers,
+            json=payload,
+            timeout=60
+        )
+        
+        # print(f"🎥 Kie.ai response body: {resp.text}") # Keep debug if needed
+        
+        if resp.status_code == 200:
+            data = resp.json()
             
-            try:
-                resp = requests.post(
-                    "https://api.kie.ai/api/v1/jobs/createTask",
-                    headers=headers,
-                    json=payload,
-                    timeout=60
-                )
-                
-                print(f"🎥 Kie.ai response body: {resp.text}")
-                
-                if resp.status_code == 200:
-                    data = resp.json()
-                    
-                    if data.get('code') == 0 or (not data.get('code') and data.get('data')):
-                         task_id = data.get('data', {}).get('taskId') or data.get('taskId')
-                         if task_id:
-                             print(f"🎥 Success! Task created: {task_id}")
-                             return task_id
-                    
-                    msg = data.get('msg', 'Unknown error')
-                    print(f"🎥 Failed with frames {frames}: {msg}")
-                    errors.append(f"Frames {frames}: {msg}")
-                    
-                else:
-                    errors.append(f"Frames {frames}: Status {resp.status_code}")
-                
-            except Exception as e:
-                print(f"🎥 Error: {e}")
-                errors.append(str(e))
-                
-        # If all failed
-        raise Exception(f"All functionality attempts failed. Details: {'; '.join(errors)}")
+            # Kie.ai returns code 200 for success (sometimes 0)
+            if data.get('code') in [0, 200]:
+                task_id = data.get('data', {}).get('taskId') or data.get('taskId')
+                if task_id:
+                    print(f"🎥 Success! Task created: {task_id}")
+                    return task_id
+            
+            # If code is not success
+            raise Exception(f"Kie.ai logic error: {data.get('msg')} (Code: {data.get('code')})")
+            
+        else:
+            raise Exception(f"Kie.ai HTTP error {resp.status_code}: {resp.text}")
     
     def _kie_poll(self, key, task_id, max_wait=180):
         """Poll for video completion - increased timeout for Sora 2"""
