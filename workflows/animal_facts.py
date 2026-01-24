@@ -245,101 +245,58 @@ This must look 100% real - not CGI, not animated, not stylized. Pure photorealis
         # Map duration to n_frames format
         n_frames = "10s" if duration <= 10 else "15s"
         
-        # Try variations focusing on the "input" structure which showed promise
-        payloads = [
-            # Attempt 1: Nested 'input' with n_frames string (The one that bypassed 422)
-            {
-                "name": "Nested Input (n_frames)",
-                "data": {
-                    "model": "sora-2-text-to-video",
-                    "input": {
-                        "prompt": prompt,
-                        "aspect_ratio": "9:16",
-                        "n_frames": n_frames
-                    }
-                }
-            },
-            # Attempt 2: Nested 'input' with duration int
-            {
-                "name": "Nested Input (duration int)",
-                "data": {
-                    "model": "sora-2-text-to-video",
-                    "input": {
-                        "prompt": prompt,
-                        "aspect_ratio": "9:16",
-                        "duration": duration
-                    }
-                }
-            },
-            # Attempt 3: Nested 'input' using 'text' instead of prompt
-            {
-                "name": "Nested Input (text key)",
-                "data": {
-                    "model": "sora-2-text-to-video",
-                    "input": {
-                        "text": prompt,
-                        "aspect_ratio": "9:16",
-                        "n_frames": n_frames
-                    }
-                }
-            },
-             # Attempt 4: Flat but wrapped in 'parameters' (another common pattern)
-            {
-                "name": "Parameters Wrapper",
-                "data": {
-                    "model": "sora-2-text-to-video",
-                    "parameters": {
-                        "prompt": prompt,
-                        "aspect_ratio": "9:16",
-                        "n_frames": n_frames
-                    }
-                }
-            }
-        ]
+        # Valid aspect ratios to try (since "9:16" failed)
+        ratios_to_try = ["portrait", "9:16", "1:1", "16:9"]
         
         errors = []
         
-        for i, p in enumerate(payloads):
-            print(f"🎥 Kie.ai attempt {i+1} ({p['name']})")
+        for ratio in ratios_to_try:
+            print(f"🎥 Kie.ai attempt (Ratio: {ratio})")
+            
+            # Use the confirmed working structure: Nested Input
+            payload = {
+                "model": "sora-2-text-to-video",
+                "input": {
+                    "prompt": prompt,
+                    "aspect_ratio": ratio,
+                    "n_frames": n_frames
+                } 
+            }
             
             try:
                 resp = requests.post(
                     "https://api.kie.ai/api/v1/jobs/createTask",
                     headers=headers,
-                    json=p['data'],
+                    json=payload,
                     timeout=60
                 )
                 
-                print(f"🎥 Kie.ai response status: {resp.status_code}")
                 print(f"🎥 Kie.ai response body: {resp.text}")
                 
                 if resp.status_code == 200:
                     data = resp.json()
                     
-                    # Safer parsing logic
-                    # Check for explicit error code
-                    if data.get('code') and data.get('code') != 0 and data.get('code') != 200:
-                         print(f"🎥 Failed with code {data.get('code')}: {data.get('msg')}")
-                         errors.append(f"{p['name']}: {data.get('msg')}")
-                         continue
-
-                    # Try to extract task ID from various locations
-                    # Handle case where data.get('data') is None
-                    inner_data = data.get('data') or {}
-                    task_id = inner_data.get('taskId') or inner_data.get('task_id') or data.get('taskId') or data.get('task_id')
+                    # If this ratio worked, we are done!
+                    if data.get('code') == 0 or (not data.get('code') and data.get('data')):
+                         task_id = data.get('data', {}).get('taskId') or data.get('taskId')
+                         if task_id:
+                             print(f"🎥 Success! Task created: {task_id}")
+                             return task_id
                     
-                    if task_id:
-                        print(f"🎥 Success! Task created: {task_id}")
-                        return task_id
-                
-                errors.append(f"{p['name']}: {resp.text}")
+                    # Capture specific error message
+                    msg = data.get('msg', 'Unknown error')
+                    print(f"🎥 Failed with ratio {ratio}: {msg}")
+                    errors.append(f"Ratio {ratio}: {msg}")
+                    
+                else:
+                    errors.append(f"Ratio {ratio}: Status {resp.status_code}")
                 
             except Exception as e:
-                print(f"🎥 Attempt {i+1} error: {e}")
-                errors.append(f"{p['name']} error: {str(e)}")
+                print(f"🎥 Error: {e}")
+                errors.append(str(e))
                 
-        # If all failed
-        raise Exception(f"All Kie.ai attempts failed. Details: {'; '.join(errors)}")
+        # If all ratios failed
+        raise Exception(f"All functionality attempts failed. Details: {'; '.join(errors)}")
     
     def _kie_poll(self, key, task_id, max_wait=180):
         """Poll for video completion - increased timeout for Sora 2"""
