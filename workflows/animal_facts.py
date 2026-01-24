@@ -242,41 +242,81 @@ This must look 100% real - not CGI, not animated, not stylized. Pure photorealis
             "Content-Type": "application/json"
         }
         
-        # Map duration to n_frames format (10s or 15s are common options)
+        # Map duration to n_frames format
         n_frames = "10s" if duration <= 10 else "15s"
         
-        payload = {
-            "model": "sora-2-text-to-video",
-            "prompt": prompt,
-            "aspect_ratio": "portrait",  # 9:16 for shorts
-            "n_frames": n_frames,
-            "size": "standard"
-        }
+        # Try multiple payload variations to find the correct one
+        payloads = [
+            # Attempt 1: Standard flat with n_frames (most documentation matches this)
+            {
+                "model": "sora-2-text-to-video",
+                "prompt": prompt,
+                "aspect_ratio": "9:16",
+                "n_frames": n_frames,
+                "size": "standard"
+            },
+            # Attempt 2: Maybe 'duration' instead of n_frames?
+            {
+                "model": "sora-2-text-to-video",
+                "prompt": prompt,
+                "aspect_ratio": "9:16",
+                "duration": duration
+            },
+            # Attempt 3: Nested in 'input' key (common pattern for "Input cannot be null")
+            {
+                "model": "sora-2-text-to-video",
+                "input": {
+                    "prompt": prompt,
+                    "aspect_ratio": "9:16",
+                    "n_frames": n_frames
+                }
+            },
+            # Attempt 4: 'text' instead of 'prompt'
+            {
+                "model": "sora-2-text-to-video",
+                "text": prompt,
+                "aspect_ratio": "9:16",
+                "n_frames": n_frames
+            }
+        ]
         
-        print(f"🎥 Kie.ai request: {payload['model']}, {n_frames}")
+        errors = []
         
-        resp = requests.post(
-            "https://api.kie.ai/api/v1/jobs/createTask",
-            headers=headers,
-            json=payload,
-            timeout=60
-        )
-        
-        print(f"🎥 Kie.ai response status: {resp.status_code}")
-        print(f"🎥 Kie.ai response body: {resp.text}")
-        
-        if resp.status_code != 200:
-            # Return the full error response so we can debug it
-            raise Exception(f"Kie.ai error ({resp.status_code}): {resp.text}")
-        
-        data = resp.json()
-        task_id = data.get('data', {}).get('taskId') or data.get('taskId') or data.get('task_id')
-        
-        if not task_id:
-            raise Exception(f"No task ID in response: {data}")
+        for i, payload in enumerate(payloads):
+            print(f"🎥 Kie.ai attempt {i+1} Request: {payload.keys()}")
             
-        print(f"🎥 Task created: {task_id}")
-        return task_id
+            try:
+                resp = requests.post(
+                    "https://api.kie.ai/api/v1/jobs/createTask",
+                    headers=headers,
+                    json=payload,
+                    timeout=60
+                )
+                
+                print(f"🎥 Kie.ai response status: {resp.status_code}")
+                
+                if resp.status_code == 200:
+                    data = resp.json()
+                    # Check for logical error in 200 OK body
+                    if data.get('code') == 422:
+                        print(f"🎥 Attempt {i+1} failed (422): {data.get('msg')}")
+                        errors.append(f"Attempt {i+1}: {data.get('msg')}")
+                        continue
+                        
+                    task_id = data.get('data', {}).get('taskId') or data.get('taskId') or data.get('task_id')
+                    if task_id:
+                        print(f"🎥 Success! Task created: {task_id}")
+                        return task_id
+                
+                print(f"🎥 Kie.ai response body: {resp.text}")
+                errors.append(f"Attempt {i+1}: {resp.text}")
+                
+            except Exception as e:
+                print(f"🎥 Attempt {i+1} error: {e}")
+                errors.append(str(e))
+                
+        # If all failed
+        raise Exception(f"All Kie.ai attempts failed. Errors: {'; '.join(errors)}")
     
     def _kie_poll(self, key, task_id, max_wait=180):
         """Poll for video completion - increased timeout for Sora 2"""
