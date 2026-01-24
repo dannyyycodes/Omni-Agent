@@ -242,25 +242,22 @@ This must look 100% real - not CGI, not animated, not stylized. Pure photorealis
             "Content-Type": "application/json"
         }
         
-        # Map duration to n_frames format
-        n_frames = "10s" if duration <= 10 else "15s"
-        
-        # Valid aspect ratios to try (since "9:16" failed)
-        ratios_to_try = ["portrait", "9:16", "1:1", "16:9"]
+        # We found the working structure (Nested Input) and Ratio (portrait)!
+        # Now finding the correct n_frames value.
+        frames_options = [10, "10", 5, "5", "10s", 15, "15"]
         
         errors = []
         
-        for ratio in ratios_to_try:
-            print(f"🎥 Kie.ai attempt (Ratio: {ratio})")
+        for frames in frames_options:
+            print(f"🎥 Kie.ai attempt (Ratio: portrait, Frames: {frames})")
             
-            # Use the confirmed working structure: Nested Input
             payload = {
                 "model": "sora-2-text-to-video",
                 "input": {
                     "prompt": prompt,
-                    "aspect_ratio": ratio,
-                    "n_frames": n_frames
-                } 
+                    "aspect_ratio": "portrait",
+                    "n_frames": frames
+                }
             }
             
             try:
@@ -276,26 +273,24 @@ This must look 100% real - not CGI, not animated, not stylized. Pure photorealis
                 if resp.status_code == 200:
                     data = resp.json()
                     
-                    # If this ratio worked, we are done!
                     if data.get('code') == 0 or (not data.get('code') and data.get('data')):
                          task_id = data.get('data', {}).get('taskId') or data.get('taskId')
                          if task_id:
                              print(f"🎥 Success! Task created: {task_id}")
                              return task_id
                     
-                    # Capture specific error message
                     msg = data.get('msg', 'Unknown error')
-                    print(f"🎥 Failed with ratio {ratio}: {msg}")
-                    errors.append(f"Ratio {ratio}: {msg}")
+                    print(f"🎥 Failed with frames {frames}: {msg}")
+                    errors.append(f"Frames {frames}: {msg}")
                     
                 else:
-                    errors.append(f"Ratio {ratio}: Status {resp.status_code}")
+                    errors.append(f"Frames {frames}: Status {resp.status_code}")
                 
             except Exception as e:
                 print(f"🎥 Error: {e}")
                 errors.append(str(e))
                 
-        # If all ratios failed
+        # If all failed
         raise Exception(f"All functionality attempts failed. Details: {'; '.join(errors)}")
     
     def _kie_poll(self, key, task_id, max_wait=180):
