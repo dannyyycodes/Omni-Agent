@@ -2,11 +2,63 @@
 
 {% block content %}
 <div class="header">
-    <h1>Active Workflows</h1>
-    <p>Manage your autonomous agents and automations.</p>
+    <h1>🎬 Workflows & Scheduling</h1>
+    <p>Manage automations and auto-post schedules.</p>
 </div>
 
+<!-- Auto-Scheduler Panel -->
+<div class="glass-panel" style="padding: 30px; margin-bottom: 20px;">
+    <h2 style="margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
+        <span>⏰</span> Auto-Scheduler
+    </h2>
+    
+    <div id="scheduler-panel" style="display: grid; gap: 15px;">
+        <div style="background: rgba(255,255,255,0.05); padding: 20px; border-radius: 12px; border: 1px solid var(--glass-border);">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+                <div>
+                    <strong style="font-size: 1.1rem;">🐾 Animal Facts Auto-Poster</strong>
+                    <div style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 5px;">
+                        Generate and post viral animal videos automatically
+                    </div>
+                </div>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <select id="schedule-interval" style="padding: 10px; border-radius: 8px; background: rgba(0,0,0,0.3); color: white; border: 1px solid var(--glass-border);">
+                        <option value="2">Every 2 hours (12/day)</option>
+                        <option value="4" selected>Every 4 hours (6/day)</option>
+                        <option value="6">Every 6 hours (4/day)</option>
+                        <option value="8">Every 8 hours (3/day)</option>
+                        <option value="12">Every 12 hours (2/day)</option>
+                        <option value="24">Daily (1/day)</option>
+                    </select>
+                    <button id="schedule-toggle" class="btn btn-primary" onclick="toggleSchedule()">
+                        Enable
+                    </button>
+                </div>
+            </div>
+            <div id="schedule-status" style="margin-top: 15px; padding: 10px; border-radius: 8px; background: rgba(0,0,0,0.2); font-size: 0.9rem;">
+                Loading schedule status...
+            </div>
+        </div>
+    </div>
+    
+    <!-- Quick Actions -->
+    <div style="margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
+        <button class="btn" onclick="runNow()" style="background: rgba(99, 102, 241, 0.2);">
+            ▶ Run Now
+        </button>
+        <button class="btn" onclick="previewNext()" style="background: rgba(139, 92, 246, 0.2);">
+            👁 Preview Next
+        </button>
+        <button class="btn" onclick="showLogs()" style="background: rgba(6, 182, 212, 0.2);">
+            📋 View Logs
+        </button>
+    </div>
+</div>
+
+<!-- Active Workflows -->
 <div class="glass-panel" style="padding: 30px;">
+    <h2 style="margin-bottom: 20px;">⚡ Active Workflows</h2>
+    
     {% if workflows %}
     <div style="display: grid; gap: 15px;">
         {% for w in workflows %}
@@ -22,10 +74,7 @@
                     {{ 'Active' if w.enabled else 'Paused' }}
                 </span>
                 <button class="btn" style="padding: 8px;" onclick="window.location.href='/chat?msg=Run {{ w.name }}'">
-                    <i data-lucide="play" size="16"></i>
-                </button>
-                <button class="btn" style="padding: 8px;">
-                    <i data-lucide="settings" size="16"></i>
+                    ▶
                 </button>
             </div>
         </div>
@@ -33,11 +82,148 @@
     </div>
     {% else %}
     <div style="text-align: center; padding: 40px; color: var(--text-secondary);">
-        <i data-lucide="ghost" size="48" style="margin-bottom: 20px; opacity: 0.5;"></i>
-        <p>No workflows found yet.</p>
+        <p>No custom workflows yet.</p>
         <button class="btn btn-primary" style="margin-top: 20px;"
             onclick="window.location.href='/chat?msg=Create a new workflow'">Create One</button>
     </div>
     {% endif %}
 </div>
+
+<!-- Logs Modal -->
+<div id="logs-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 1000; padding: 40px; overflow-y: auto;">
+    <div style="max-width: 600px; margin: auto; background: var(--bg-card, #1a1a25); border-radius: 16px; padding: 30px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h3>📋 Scheduler Logs</h3>
+            <button onclick="closeLogs()" style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer;">×</button>
+        </div>
+        <div id="logs-content" style="max-height: 400px; overflow-y: auto;">Loading...</div>
+    </div>
+</div>
+
+<script>
+let currentScheduleEnabled = false;
+
+async function loadScheduleStatus() {
+    try {
+        const resp = await fetch('/api/scheduler/schedules');
+        const data = await resp.json();
+        
+        const animalFacts = data.schedules?.find(s => s.workflow === 'animal_facts');
+        
+        const statusDiv = document.getElementById('schedule-status');
+        const toggleBtn = document.getElementById('schedule-toggle');
+        const intervalSelect = document.getElementById('schedule-interval');
+        
+        if (animalFacts && animalFacts.enabled) {
+            currentScheduleEnabled = true;
+            statusDiv.innerHTML = `<span style="color: var(--success);">✅ Active</span> - Posting ${animalFacts.posts_per_day}x per day (every ${animalFacts.interval_hours} hours)`;
+            toggleBtn.textContent = 'Disable';
+            toggleBtn.classList.remove('btn-primary');
+            toggleBtn.style.background = 'rgba(239, 68, 68, 0.3)';
+            intervalSelect.value = animalFacts.interval_hours;
+        } else {
+            currentScheduleEnabled = false;
+            statusDiv.innerHTML = '<span style="color: var(--text-secondary);">⏸ Not scheduled</span> - Enable to start auto-posting';
+            toggleBtn.textContent = 'Enable';
+            toggleBtn.classList.add('btn-primary');
+            toggleBtn.style.background = '';
+        }
+    } catch (e) {
+        document.getElementById('schedule-status').textContent = 'Error loading status';
+    }
+}
+
+async function toggleSchedule() {
+    const interval = parseInt(document.getElementById('schedule-interval').value);
+    const enable = !currentScheduleEnabled;
+    
+    try {
+        const resp = await fetch('/api/scheduler/schedules', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                workflow_type: 'animal_facts',
+                interval_hours: interval,
+                enabled: enable
+            })
+        });
+        
+        const data = await resp.json();
+        
+        if (data.success) {
+            loadScheduleStatus();
+        } else {
+            alert('Error: ' + (data.error || 'Failed to update schedule'));
+        }
+    } catch (e) {
+        alert('Error: ' + e.message);
+    }
+}
+
+async function runNow() {
+    document.getElementById('schedule-status').innerHTML = '<span style="color: var(--warning);">⏳ Generating video...</span> This may take 1-2 minutes';
+    
+    try {
+        const resp = await fetch('/api/animal-facts/run', {method: 'POST'});
+        const data = await resp.json();
+        
+        if (data.status === 'success' || data.status === 'partial_success') {
+            document.getElementById('schedule-status').innerHTML = 
+                `<span style="color: var(--success);">✅ Video created!</span> ${data.animal}: ${data.fact?.substring(0, 50)}...`;
+        } else {
+            document.getElementById('schedule-status').innerHTML = 
+                `<span style="color: var(--error);">❌ Error:</span> ${data.error || data.message}`;
+        }
+    } catch (e) {
+        document.getElementById('schedule-status').innerHTML = `<span style="color: var(--error);">❌ Error:</span> ${e.message}`;
+    }
+}
+
+async function previewNext() {
+    try {
+        const resp = await fetch('/api/animal-facts/preview', {method: 'POST'});
+        const data = await resp.json();
+        
+        document.getElementById('schedule-status').innerHTML = 
+            `<strong>Next Post Preview:</strong><br>🐾 ${data.animal}<br>📝 ${data.fact}`;
+    } catch (e) {
+        alert('Error: ' + e.message);
+    }
+}
+
+async function showLogs() {
+    document.getElementById('logs-modal').style.display = 'block';
+    
+    try {
+        const resp = await fetch('/api/scheduler/logs?limit=20');
+        const data = await resp.json();
+        
+        if (data.logs && data.logs.length > 0) {
+            const html = data.logs.reverse().map(log => `
+                <div style="padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); font-size: 0.9rem;">
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>${log.animal || log.workflow}</span>
+                        <span style="color: ${log.status === 'success' ? 'var(--success)' : 'var(--error)'};">
+                            ${log.status}
+                        </span>
+                    </div>
+                    <div style="color: var(--text-secondary); font-size: 0.8rem;">${log.timestamp}</div>
+                </div>
+            `).join('');
+            document.getElementById('logs-content').innerHTML = html;
+        } else {
+            document.getElementById('logs-content').innerHTML = '<p style="color: var(--text-secondary);">No logs yet. Run a workflow to see results here.</p>';
+        }
+    } catch (e) {
+        document.getElementById('logs-content').innerHTML = 'Error loading logs';
+    }
+}
+
+function closeLogs() {
+    document.getElementById('logs-modal').style.display = 'none';
+}
+
+// Load status on page load
+loadScheduleStatus();
+</script>
 {% endblock %}

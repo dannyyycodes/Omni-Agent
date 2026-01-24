@@ -183,7 +183,9 @@ class OmniBrain:
             return 'create_project'
         
         # Workflow - explicit scheduling
-        if re.search(r'(run|start|trigger|execute)\s+(sora|video|generation)', msg):
+        if re.search(r'(run|start|trigger|execute)\s+(sora|video|generation|animal|fact)', msg):
+            return 'run_workflow'
+        if re.search(r'animal\s*fact', msg):
             return 'run_workflow'
         if re.search(r'(every|daily|weekly)\s+.*(run|post|send|generate)', msg):
             return 'create_workflow'
@@ -477,35 +479,87 @@ Say **"cancel"** to abort."""}
 🧠 Memory: {self.memory.count()} entries"""}
     
     def _handle_run_workflow(self, message):
-        """Run a workflow (specially Sora)"""
-        # For now, we hardcode the Sora hook since that's the primary use case
-        if 'sora' in message.lower() or 'video' in message.lower():
+        """Run a workflow (Animal Facts V2 or Sora V1)"""
+        msg_lower = message.lower()
+        
+        # ANIMAL FACTS V2 - The viral content machine
+        if 'animal' in msg_lower or 'fact' in msg_lower:
             try:
-                # Import dynamically to avoid circular deps
+                from workflows.animal_facts import AnimalFactsWorkflow
+                
+                if not os.environ.get('KIE_API_KEY'):
+                    return {'response': "⚠️ **Missing KIE_API_KEY.** Go to Settings to add it."}
+                
+                # Check for specific animal request
+                animal_id = None
+                for animal in ['penguin', 'elephant', 'lion', 'tiger', 'dolphin', 'panda', 'koala', 'fox', 'owl', 'whale']:
+                    if animal in msg_lower:
+                        animal_id = animal
+                        break
+                
+                workflow = AnimalFactsWorkflow(self.api_hub, self.model_router)
+                
+                # Preview mode (no API credits spent)
+                if 'preview' in msg_lower or 'test' in msg_lower:
+                    result = workflow.preview(animal_id)
+                    return {'response': f"""📋 **Animal Facts Preview**
+
+🐾 **{result.get('animal', 'Unknown')}**
+📝 Fact: {result.get('fact', 'N/A')}
+🎨 Sora Prompt: {result.get('sora_prompt', 'N/A')[:200]}...
+
+_This is a preview. Say "Run animal facts" to generate the actual video._"""}
+                
+                # Full run
+                result = workflow.run(animal_id)
+                
+                status = result.get('status', 'unknown')
+                video = result.get('video', 'N/A')
+                
+                if status == 'success':
+                    return {'response': f"""🎬 **Animal Facts Video Complete!**
+
+🐾 **{result.get('animal', 'Unknown')}**
+📝 {result.get('fact', '')[:150]}...
+📹 Video: {video}
+✅ Posted to Instagram, TikTok, YouTube Shorts!
+
+Post ID: {result.get('post_id', 'N/A')}"""}
+                elif status == 'partial_success':
+                    return {'response': f"""🎬 **Animal Facts Video Ready**
+
+🐾 **{result.get('animal', 'Unknown')}**
+📝 {result.get('fact', '')[:150]}...
+📹 Video: {video}
+⚠️ {result.get('message', 'Video ready but posting skipped.')}"""}
+                else:
+                    return {'response': f"❌ Animal Facts failed: {result.get('error', result.get('message', 'Unknown error'))}"}
+                    
+            except Exception as e:
+                return {'response': f"Failed to run Animal Facts: {str(e)}"}
+        
+        # SORA V1 - Legacy video workflow
+        if 'sora' in msg_lower or 'video' in msg_lower:
+            try:
                 from workflows.sora_automation import SoraAutomation
                 
-                # Check for API keys
-                import os
                 if not os.environ.get('KIE_API_KEY'):
-                    return {'response': "⚠️ **Missing credentials.** Please go to Settings and add your `KIE_API_KEY`."}
+                    return {'response': "⚠️ **Missing KIE_API_KEY.** Go to Settings to add it."}
 
                 runner = SoraAutomation(self.api_hub)
                 result = runner.run()
                 
                 return {'response': f"""🎬 **Sora Workflow Started**
                 
-I have triggered the **{result.get('idea', 'New Video')}** sequence.
+Triggered: **{result.get('idea', 'New Video')}**
 
-**Result:**
 - 🎨 Prompt: Generated
 - 📹 Video: {result.get('video')}
-- 🚀 Status: {result.get('status')}
-
-(Note: In this V6 version, this is a simulation. The real API call is ready to be uncommented in `workflows/sora_automation.py` when you are ready to spend credits.)"""}
+- 🚀 Status: {result.get('status')}"""}
             except Exception as e:
-                return {'response': f"Failed to run workflow: {str(e)}"}
+                return {'response': f"Failed to run Sora: {str(e)}"}
         
-        return {'response': "Which workflow should I run?"}
+        return {'response': "Which workflow? Try:\n- **Run animal facts** (viral animal content)\n- **Run sora video** (custom video)"}
 
     def transcribe_audio(self, filepath):
         return "Voice coming soon!"
