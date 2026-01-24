@@ -237,44 +237,68 @@ This must look 100% real - not CGI, not animated, not stylized. Pure photorealis
     
     def _kie_generate(self, key, prompt, duration=10):
         """Generate video via Kie.ai with configurable duration"""
-        headers = {"Authorization": f"Bearer {key}"}
+        headers = {
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json"
+        }
         
-        # Kie.ai supports different durations
+        # Map duration to n_frames format (10s or 15s are common options)
+        n_frames = "10s" if duration <= 10 else "15s"
+        
+        payload = {
+            "model": "sora-2-text-to-video",
+            "prompt": prompt,
+            "aspect_ratio": "portrait",  # 9:16 for shorts
+            "n_frames": n_frames,
+            "size": "standard"
+        }
+        
+        print(f"🎥 Kie.ai request: {payload['model']}, {n_frames}")
+        
         resp = requests.post(
             "https://api.kie.ai/api/v1/jobs/createTask",
             headers=headers,
-            json={
-                "model": "sora-2-text-to-video",
-                "prompt": prompt,
-                "aspect_ratio": "9:16",
-                "duration": duration  # 5, 10, 15, or 20 seconds
-            },
+            json=payload,
             timeout=60
         )
+        
+        print(f"🎥 Kie.ai response status: {resp.status_code}")
+        
+        if resp.status_code != 200:
+            raise Exception(f"Kie.ai API error {resp.status_code}: {resp.text}")
+        
         data = resp.json()
-        task_id = data.get('data', {}).get('taskId')
+        task_id = data.get('data', {}).get('taskId') or data.get('taskId') or data.get('task_id')
+        
         if not task_id:
-            raise Exception(f"No task ID returned: {data}")
+            raise Exception(f"No task ID in response: {data}")
+            
+        print(f"🎥 Task created: {task_id}")
         return task_id
     
-    def _kie_poll(self, key, task_id, max_wait=120):
-        """Poll for video completion"""
+    def _kie_poll(self, key, task_id, max_wait=180):
+        """Poll for video completion - increased timeout for Sora 2"""
         headers = {"Authorization": f"Bearer {key}"}
         polls = max_wait // 5
         
-        for _ in range(polls):
+        for i in range(polls):
             resp = requests.get(
                 f"https://api.kie.ai/api/v1/jobs/{task_id}",
                 headers=headers,
                 timeout=30
             )
-            data = resp.json().get('data', {})
-            status = data.get('status')
+            data = resp.json().get('data', {}) if resp.json().get('data') else resp.json()
+            status = data.get('status', '').lower()
             
-            if status == 'completed':
-                return data.get('result_url')
-            elif status == 'failed':
-                raise Exception(f"Generation failed: {data.get('error')}")
+            print(f"🎥 Poll {i+1}/{polls}: {status}")
+            
+            if status in ['completed', 'success', 'done']:
+                video_url = data.get('result_url') or data.get('video_url') or data.get('output_url')
+                if video_url:
+                    return video_url
+                raise Exception(f"Completed but no video URL: {data}")
+            elif status in ['failed', 'error']:
+                raise Exception(f"Generation failed: {data.get('error', data)}")
             
             time.sleep(5)
         
