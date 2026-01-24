@@ -282,23 +282,42 @@ This must look 100% real - not CGI, not animated, not stylized. Pure photorealis
         polls = max_wait // 5
         
         for i in range(polls):
-            resp = requests.get(
-                f"https://api.kie.ai/api/v1/jobs/{task_id}",
-                headers=headers,
-                timeout=30
-            )
-            data = resp.json().get('data', {}) if resp.json().get('data') else resp.json()
-            status = data.get('status', '').lower()
-            
-            print(f"🎥 Poll {i+1}/{polls}: {status}")
-            
-            if status in ['completed', 'success', 'done']:
-                video_url = data.get('result_url') or data.get('video_url') or data.get('output_url')
-                if video_url:
-                    return video_url
-                raise Exception(f"Completed but no video URL: {data}")
-            elif status in ['failed', 'error']:
-                raise Exception(f"Generation failed: {data.get('error', data)}")
+            try:
+                resp = requests.get(
+                    f"https://api.kie.ai/api/v1/jobs/{task_id}",
+                    headers=headers,
+                    timeout=30
+                )
+                
+                response_json = resp.json()
+                print(f"🎥 Poll {i+1}/{polls} response: {resp.status_code}")
+                
+                # Handle different response structures
+                if isinstance(response_json, dict):
+                    data = response_json.get('data', response_json)
+                    if data is None:
+                        data = response_json
+                else:
+                    data = {}
+                
+                status = str(data.get('status', '')).lower() if isinstance(data, dict) else ''
+                
+                print(f"🎥 Status: {status}")
+                
+                if status in ['completed', 'success', 'done', 'finished']:
+                    video_url = (data.get('result_url') or data.get('video_url') or 
+                                data.get('output_url') or data.get('url'))
+                    if video_url:
+                        print(f"🎥 Video ready: {video_url}")
+                        return video_url
+                    raise Exception(f"Completed but no video URL: {data}")
+                elif status in ['failed', 'error']:
+                    raise Exception(f"Generation failed: {data.get('error', data)}")
+                elif status in ['pending', 'processing', 'running', 'queued', '']:
+                    pass  # Still processing, continue polling
+                    
+            except requests.exceptions.RequestException as e:
+                print(f"🎥 Poll error: {e}")
             
             time.sleep(5)
         
