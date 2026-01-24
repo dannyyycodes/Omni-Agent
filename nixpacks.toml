@@ -1,11 +1,5 @@
 # Nixpacks configuration for Railway deployment
-# Adds Python, FFmpeg, and required system dependencies
+# Only adds extra system packages - lets Railway auto-detect Python
 
 [phases.setup]
-nixPkgs = ["python311", "python311Packages.pip", "ffmpeg", "dejavu_fonts", "file"]
-
-[phases.install]
-cmds = ["python -m pip install -r requirements.txt"]
-
-[start]
-cmd = "gunicorn app:app --workers 2 --timeout 120 --bind 0.0.0.0:$PORT"
+nixPkgs = ["ffmpeg", "dejavu_fonts", "file"]
