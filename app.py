@@ -168,28 +168,21 @@ def settings_page():
     }
     return render_template('settings.html', page='settings', config=config)
 
+
 @app.route('/pipeline')
 def pipeline_page():
     """Pipeline Command Center"""
-    # In Phase 1, we simulate the data structure that the Universal Brain will eventually populate.
-    # Phase 2 will wire this to a real database table 'pipeline_items'
+    # Real data will be populated by workflows when they run
+    # No more mock/placeholder data
     
     pipeline_data = {
-        'ideas': [
-            {'source': 'Reddit', 'title': 'AI generated Python tutorial', 'date': '2m ago'},
-            {'source': 'Twitter', 'title': 'React vs Vue 2026', 'date': '1h ago'}
-        ],
-        'in_progress': [
-            {'type': 'Sora Video', 'title': 'Baby Goat Hops', 'status': 'Generating Video (Kie.ai)...', 'progress': 65}
-        ],
-        'review': [
-            {'type': 'Tweet', 'title': 'Gemini 1.5 Update News', 'source': 'TechCrunch'}
-        ],
-        'published': [
-            {'type': 'Video', 'title': 'Daily AI News Recap', 'views': 1240}
-        ]
+        'ideas': [],
+        'in_progress': [],
+        'review': [],
+        'published': []
     }
     return render_template('pipeline.html', page='pipeline', pipeline=pipeline_data)
+
 
 @app.route('/api/settings', methods=['POST'])
 def save_settings():
