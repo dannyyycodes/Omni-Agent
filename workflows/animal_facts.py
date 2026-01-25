@@ -292,14 +292,21 @@ This must look 100% real - not CGI, not animated, not stylized. Pure photorealis
         
         for i in range(polls):
             try:
+                # Correct Kie.ai polling endpoint uses query parameter
                 resp = requests.get(
-                    f"https://api.kie.ai/api/v1/jobs/{task_id}",
+                    f"https://api.kie.ai/api/v1/jobs/recordInfo?taskId={task_id}",
                     headers=headers,
                     timeout=30
                 )
                 
-                response_json = resp.json()
                 print(f"🎥 Poll {i+1}/{polls} response: {resp.status_code}")
+                
+                if resp.status_code != 200:
+                    print(f"🎥 Poll error: HTTP {resp.status_code}")
+                    time.sleep(5)
+                    continue
+                
+                response_json = resp.json()
                 
                 # Handle different response structures
                 if isinstance(response_json, dict):
