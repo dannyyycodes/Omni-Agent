@@ -1,0 +1,232 @@
+"""
+Background Video Task Processor - Production Ready
+Handles async video generation with retry logic and error handling
+"""
+
+import os
+import time
+import json
+import requests
+from datetime import datetime, timedelta
+from core.memory import MemoryManager, PendingVideoTask, HAS_SQLALCHEMY
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+import logging
+
+logger = logging.getLogger(__name__)
+
+class VideoTaskProcessor:
+    """Process pending video generation tasks in the background"""
+    
+    RETRY_DELAYS = [30, 60, 120]  # Exponential backoff in seconds
+    MAX_RETRIES = 3
+    MAX_TASK_AGE_MINUTES = 15  # Dead letter after 15 minutes
+    
+    def __init__(self):
+        self.database_url = os.environ.get('DATABASE_URL', 'sqlite:///omni_memory.db')
+        if self.database_url.startswith('postgres://'):
+            self.database_url = self.database_url.replace('postgres://', 'postgresql://', 1)
+        
+        if HAS_SQLALCHEMY:
+            self.engine = create_engine(self.database_url)
+            Session = sessionmaker(bind=self.engine)
+            self.session = Session()
+        else:
+            self.session = None
+            logger.warning("No database available for video task processing")
+    
+    def process_pending_tasks(self):
+        """Check all pending tasks and process them"""
+        if not self.session:
+            return
+        
+        try:
+            # Get tasks that are ready to process
+            now = datetime.utcnow()
+            tasks = self.session.query(PendingVideoTask).filter(
+                PendingVideoTask.status.in_(['pending', 'processing', 'failed']),
+                (PendingVideoTask.next_retry_at == None) | (PendingVideoTask.next_retry_at <= now)
+            ).limit(5).all()  # Process up to 5 tasks concurrently
+            
+            if tasks:
+                logger.info(f"🔄 Processing {len(tasks)} pending video tasks...")
+            
+            for task in tasks:
+                try:
+                    self._process_task(task)
+                except Exception as e:
+                    logger.error(f"Error processing task {task.task_id}: {e}")
+                    self._handle_task_error(task, str(e))
+            
+            # Check for timed-out tasks
+            self._check_timeouts()
+            
+        except Exception as e:
+            logger.error(f"Error in process_pending_tasks: {e}")
+    
+    def _process_task(self, task):
+        """Process a single task"""
+        kie_key = os.environ.get('KIE_API_KEY')
+        if not kie_key:
+            logger.error("Missing KIE_API_KEY")
+            return
+        
+        # Check if task is too old
+        age_minutes = (datetime.utcnow() - task.created_at).total_seconds() / 60
+        if age_minutes > self.MAX_TASK_AGE_MINUTES:
+            logger.warning(f"Task {task.task_id[:8]}... timed out after {age_minutes:.1f} minutes")
+            task.status = 'dead_letter'
+            task.error_message = f"Timed out after {age_minutes:.1f} minutes"
+            self.session.commit()
+            return
+        
+        # Poll Kie.ai for status
+        try:
+            headers = {"Authorization": f"Bearer {kie_key}"}
+            resp = requests.get(
+                f"https://api.kie.ai/api/v1/jobs/recordInfo?taskId={task.task_id}",
+                headers=headers,
+                timeout=30
+            )
+            
+            if resp.status_code != 200:
+                logger.warning(f"Kie.ai poll failed: {resp.status_code}")
+                raise Exception(f"Kie.ai returned {resp.status_code}")
+            
+            data = resp.json().get('data', {})
+            progress = data.get('progress', 0)
+            result_json = data.get('resultJson', '')
+            
+            # Update task
+            task.last_poll_at = datetime.utcnow()
+            task.progress = progress
+            
+            if progress > 0 and task.status == 'pending':
+                task.status = 'processing'
+            
+            logger.info(f"📹 Task {task.task_id[:8]}... ({task.animal_name}): {progress}%")
+            
+            # Check if completed
+            if result_json:
+                self._handle_completion(task, result_json)
+            
+            self.session.commit()
+            
+        except requests.exceptions.RequestException as e:
+            logger.warning(f"Network error polling Kie.ai: {e}")
+            raise  # Will trigger retry logic
+    
+    def _handle_completion(self, task, result_json):
+        """Handle completed video generation"""
+        try:
+            # Parse result
+            result_data = json.loads(result_json) if isinstance(result_json, str) else result_json
+            video_url = (result_data.get('videoUrl') or 
+                       result_data.get('video_url') or 
+                       result_data.get('url'))
+            
+            if not video_url:
+                logger.warning(f"No video URL in resultJson for {task.task_id}")
+                return
+            
+            logger.info(f"✅ Video ready for {task.animal_name}: {video_url}")
+            task.video_url = video_url
+            
+            # Post to Blotato
+            self._post_to_blotato(task, video_url)
+            
+            # Mark as completed
+            task.status = 'completed'
+            task.completed_at = datetime.utcnow()
+            
+        except Exception as e:
+            logger.error(f"Error handling completion: {e}")
+            raise
+    
+    def _post_to_blotato(self, task, video_url):
+        """Post completed video to Blotato"""
+        blotato_key = os.environ.get('BLOTATO_API_KEY')
+        if not blotato_key:
+            logger.warning("Missing BLOTATO_API_KEY, skipping post")
+            return
+        
+        try:
+            # Download video
+            logger.info(f"📥 Downloading video: {video_url}")
+            video_resp = requests.get(video_url, timeout=60)
+            video_resp.raise_for_status()
+            
+            # Post to Blotato
+            logger.info(f"📤 Posting to Blotato...")
+            blotato_resp = requests.post(
+                "https://api.blotato.com/v1/post",
+                headers={"Authorization": f"Bearer {blotato_key}"},
+                files={"video": ("video.mp4", video_resp.content, "video/mp4")},
+                data={
+                    "caption": task.caption,
+                    "platforms": "tiktok,instagram,youtube_shorts"
+                },
+                timeout=60
+            )
+            blotato_resp.raise_for_status()
+            
+            logger.info(f"✅ Posted to social media: {task.animal_name}")
+            
+        except Exception as e:
+            logger.error(f"Blotato posting failed: {e}")
+            # Don't raise - we have the video, posting can be retried separately
+    
+    def _handle_task_error(self, task, error_msg):
+        """Handle task error with retry logic"""
+        task.error_message = error_msg
+        task.retry_count += 1
+        task.updated_at = datetime.utcnow()
+        
+        if task.retry_count >= self.MAX_RETRIES:
+            logger.error(f"Task {task.task_id[:8]}... failed after {task.retry_count} retries")
+            task.status = 'dead_letter'
+        else:
+            # Schedule retry with exponential backoff
+            delay_seconds = self.RETRY_DELAYS[min(task.retry_count - 1, len(self.RETRY_DELAYS) - 1)]
+            task.next_retry_at = datetime.utcnow() + timedelta(seconds=delay_seconds)
+            task.status = 'failed'
+            logger.info(f"Task {task.task_id[:8]}... will retry in {delay_seconds}s (attempt {task.retry_count}/{self.MAX_RETRIES})")
+        
+        self.session.commit()
+    
+    def _check_timeouts(self):
+        """Check for tasks that have exceeded max age"""
+        try:
+            cutoff_time = datetime.utcnow() - timedelta(minutes=self.MAX_TASK_AGE_MINUTES)
+            timed_out_tasks = self.session.query(PendingVideoTask).filter(
+                PendingVideoTask.status.in_(['pending', 'processing', 'failed']),
+                PendingVideoTask.created_at < cutoff_time
+            ).all()
+            
+            for task in timed_out_tasks:
+                logger.warning(f"Task {task.task_id[:8]}... timed out")
+                task.status = 'dead_letter'
+                task.error_message = f"Timed out after {self.MAX_TASK_AGE_MINUTES} minutes"
+                task.updated_at = datetime.utcnow()
+            
+            if timed_out_tasks:
+                self.session.commit()
+                
+        except Exception as e:
+            logger.error(f"Error checking timeouts: {e}")
+
+
+# Global processor instance
+_processor = None
+
+def get_processor():
+    """Get or create processor instance"""
+    global _processor
+    if _processor is None:
+        _processor = VideoTaskProcessor()
+    return _processor
+
+def process_pending_videos():
+    """Entry point for scheduler"""
+    processor = get_processor()
+    processor.process_pending_tasks()

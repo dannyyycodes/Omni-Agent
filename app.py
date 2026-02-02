@@ -596,8 +596,12 @@ def api_animal_facts_run():
                 'message': 'Please add your Kie.ai API key in Settings'
             }), 400
         
+        # Use async wrapper for reliable execution
+        from core.async_workflow_wrapper import AsyncWorkflowWrapper
+        
         workflow = AnimalFactsWorkflow(api_hub, model_router)
-        result = workflow.run(animal_id, dry_run=dry_run, duration=duration)
+        async_wrapper = AsyncWorkflowWrapper(workflow)
+        result = async_wrapper.run_async(animal_id=animal_id, duration=duration)
         
         return jsonify(result)
         
