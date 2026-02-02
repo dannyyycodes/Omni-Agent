@@ -72,7 +72,13 @@ class OmniBrain:
             intent = self._detect_intent(message)
             
             # Always pass file context to handlers
-            if intent == 'self_update':
+            if intent == 'help':
+                response = self._handle_help()
+            elif intent == 'list_workflows':
+                response = self._handle_list_workflows()
+            elif intent == 'view_logs':
+                response = self._handle_view_logs()
+            elif intent == 'self_update':
                 response = self._handle_self_update(message)
             elif intent == 'check_github':
                 response = self._handle_check_github()
@@ -161,8 +167,34 @@ class OmniBrain:
         return "\n".join(file_summaries) if file_summaries else ""
     
     def _detect_intent(self, message):
-        """Detect intent carefully"""
+        """Detect intent carefully - enhanced for conversational workflow management"""
         msg = message.lower().strip()
+        
+        # Workflow execution - simple commands
+        if re.search(r'(run|start|execute|launch).*workflow', msg):
+            return 'run_workflow'
+        if re.search(r'(run|start|execute|launch).*(animal|fact)', msg):
+            return 'run_workflow'
+        
+        # Status checks - conversational
+        if re.search(r'(what|show|check|get|tell).*(status|running|active)', msg):
+            return 'status'
+        if msg in ['status', 'what\'s happening', 'what\'s running', 'show status']:
+            return 'status'
+        
+        # Log viewing - conversational
+        if re.search(r'(show|view|see|get|check).*(log|error|output)', msg):
+            return 'view_logs'
+        if 'logs' in msg or 'what happened' in msg:
+            return 'view_logs'
+        
+        # Workflow listing
+        if re.search(r'(list|show|what).*(workflow|automation)', msg):
+            return 'list_workflows'
+        
+        # Help requests
+        if msg in ['help', 'help me', 'what can you do', 'commands']:
+            return 'help'
         
         # Self-update - explicit feature requests only
         if re.search(r'^(add|create|build|implement)\s+(a\s+)?(new\s+)?(feature|capability|support|ability)', msg):
@@ -182,20 +214,13 @@ class OmniBrain:
         if re.search(r'(create|new|start)\s+(a\s+)?project', msg):
             return 'create_project'
         
-        # Workflow - explicit scheduling
-        if re.search(r'(run|start|trigger|execute)\s+(sora|video|generation|animal|fact)', msg):
-            return 'run_workflow'
-        if re.search(r'animal\s*fact', msg):
-            return 'run_workflow'
+        # Workflow creation
         if re.search(r'(every|daily|weekly)\s+.*(run|post|send|generate)', msg):
             return 'create_workflow'
         if re.search(r'(create|set up|build)\s+(a\s+)?workflow', msg):
             return 'create_workflow'
         if re.search(r'(set up|recreate|migrate).*workflow', msg):
             return 'create_workflow'
-        
-        if msg in ['status']:
-            return 'status'
         
         return 'conversation'
     
@@ -468,15 +493,113 @@ Say **"cancel"** to abort."""}
         return {'response': f"✅ Created project **{name}**. Select it from the dropdown above."}
     
     def _handle_status(self):
+        """Enhanced status with workflow information"""
         apis = [a['name'] for a in self.api_hub.list_all() if a.get('connected')]
         github = self.self_updater.check_connection()
         gh = "✅" if github.get('connected') else "❌"
         
-        return {'response': f"""**OMNI v6**
-🟢 Online (Claude 3.5 Sonnet)
-{gh} GitHub {'connected' if github.get('connected') else 'not connected'}
-🔌 APIs: {', '.join(apis) if apis else 'OpenRouter'}
-🧠 Memory: {self.memory.count()} entries"""}
+        # Get workflow status
+        all_workflows = self.workflows.list_all()
+        active_workflows = [w for w in all_workflows if w.get('enabled')]
+        
+        response = f"""**OMNI Status Report**
+
+🟢 **System:** Online (Claude 3.5 Sonnet)
+{gh} **GitHub:** {'connected' if github.get('connected') else 'not connected'}
+🔌 **APIs:** {', '.join(apis) if apis else 'OpenRouter'}
+🧠 **Memory:** {self.memory.count()} entries
+
+**Workflows:**
+- Total: {len(all_workflows)}
+- Active: {len(active_workflows)}
+- Available: Animal Facts (Sora 2 video generation)
+
+**Quick Actions:**
+- Say "Run animal facts workflow" to generate a video
+- Say "Show me the logs" to see recent activity
+- Say "Help" to see what I can do"""
+        
+        return {'response': response}
+    
+    def _handle_help(self):
+        """Show help message with available commands"""
+        return {'response': """**Here's what I can do for you:**
+
+**Run Workflows:**
+- "Run the animal facts workflow"
+- "Start generating a video"
+- "Execute animal facts"
+
+**Check Status:**
+- "What's the status?"
+- "What's running?"
+- "Show me active workflows"
+
+**View Information:**
+- "Show me the logs"
+- "What workflows do I have?"
+- "List all workflows"
+
+**Manage Workflows:**
+- "Change the posting schedule"
+- "Create a new workflow"
+- "Stop the workflow"
+
+**Just ask me naturally!** I understand conversational language, so you don't need to use exact commands. For example:
+- "Hey, can you run that animal video thing?"
+- "What's going on with my workflows?"
+- "Show me what happened last time"
+
+I'm here to make workflow management simple and stress-free! 🤖"""}
+    
+    def _handle_list_workflows(self):
+        """List all available workflows"""
+        all_workflows = self.workflows.list_all()
+        
+        if not all_workflows:
+            return {'response': "You don't have any workflows yet. Would you like me to help you create one?"}
+        
+        response = "**Your Workflows:**\n\n"
+        for w in all_workflows:
+            status = "🟢 Active" if w.get('enabled') else "⚪ Inactive"
+            name = w.get('name', 'Unnamed')
+            desc = w.get('description', 'No description')
+            response += f"{status} **{name}**\n   {desc}\n\n"
+        
+        response += "\nSay 'Run [workflow name]' to execute a workflow!"
+        return {'response': response}
+    
+    def _handle_view_logs(self):
+        """Show recent logs and activity"""
+        # Check if we have scheduler logs
+        try:
+            from core.scheduler import get_scheduler
+            scheduler = get_scheduler()
+            if scheduler:
+                logs = scheduler.get_logs(limit=5)
+                if logs:
+                    response = "**Recent Activity:**\n\n"
+                    for log in logs:
+                        timestamp = log.get('timestamp', 'Unknown time')
+                        workflow = log.get('workflow', 'Unknown')
+                        status = log.get('status', 'Unknown')
+                        emoji = "✅" if status == 'success' else "❌"
+                        response += f"{emoji} {timestamp} - {workflow}: {status}\n"
+                    return {'response': response}
+        except:
+            pass
+        
+        # Fallback: show memory
+        recent = self.memory.get_recent(limit=5)
+        if recent:
+            response = "**Recent Conversations:**\n\n"
+            for entry in recent:
+                role = "You" if entry['role'] == 'user' else "OMNI"
+                content = entry['content'][:100]
+                response += f"**{role}:** {content}...\n\n"
+            return {'response': response}
+        
+        return {'response': "No recent activity to show. Try running a workflow first!"}
     
     def _handle_run_workflow(self, message):
         """Run a workflow (Animal Facts V2 or Sora V1)"""
