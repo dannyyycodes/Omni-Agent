@@ -417,24 +417,53 @@ The tone is captivating and authentic, showcasing the {animal['name']}'s natural
                     continue
                 
                 response_json = resp.json()
-                data = response_json.get('data', response_json) if isinstance(response_json, dict) else {}
-                status = str(data.get('status', '')).lower() if isinstance(data, dict) else ''
                 
-                print(f"🎥 Status: {status}")
+                # Debug: Print full response to understand structure
+                print(f"🔍 Full response: {response_json}")
                 
-                if status in ['completed', 'success', 'done', 'finished']:
-                    video_url = data.get('videoUrl') or data.get('video_url') or data.get('url')
-                    if video_url:
-                        logger.info(f"✅ Video ready: {video_url}")
-                        return video_url
-                    else:
-                        logger.warning("Video marked complete but no URL found")
-                        
-                elif status in ['failed', 'error']:
-                    error_msg = data.get('error', 'Unknown error')
-                    logger.error(f"Kie.ai generation failed: {error_msg}")
-                    raise Exception(f"Kie.ai generation failed: {error_msg}")
+                # Handle different response structures
+                if isinstance(response_json, dict):
+                    # Try to get data from different possible locations
+                    data = response_json.get('data', response_json)
                     
+                    # Get status from multiple possible fields
+                    status = (data.get('status') or 
+                             data.get('state') or 
+                             data.get('taskStatus') or 
+                             response_json.get('status') or 
+                             response_json.get('state') or '').lower()
+                    
+                    print(f"🎥 Status: {status}")
+                    
+                    # Check if completed
+                    if status in ['completed', 'success', 'done', 'finished', 'succeed']:
+                        # Try multiple possible video URL fields
+                        video_url = (data.get('videoUrl') or 
+                                   data.get('video_url') or 
+                                   data.get('url') or
+                                   data.get('resultUrl') or
+                                   data.get('result_url') or
+                                   response_json.get('videoUrl') or
+                                   response_json.get('video_url'))
+                        
+                        if video_url:
+                            logger.info(f"✅ Video ready: {video_url}")
+                            return video_url
+                        else:
+                            logger.warning(f"Video marked complete but no URL found. Response: {response_json}")
+                            
+                    elif status in ['failed', 'error', 'failure']:
+                        error_msg = data.get('error') or data.get('message') or 'Unknown error'
+                        logger.error(f"Kie.ai generation failed: {error_msg}")
+                        raise Exception(f"Kie.ai generation failed: {error_msg}")
+                    
+                    elif status in ['pending', 'processing', 'running', 'queued', 'in_progress']:
+                        # Still processing, continue loop
+                        pass
+                    else:
+                        # Unknown status, log and continue
+                        print(f"⚠️ Unknown status: '{status}' - continuing to poll...")
+                        
             except requests.exceptions.RequestException as e:
                 logger.warning(f"Poll {i+1} request failed: {str(e)}")
                 continue
