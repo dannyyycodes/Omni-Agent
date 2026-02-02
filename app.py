@@ -96,6 +96,11 @@ def init_omni():
     global workflow_scheduler
     workflow_scheduler = init_scheduler(api_hub, model_router)
     
+    # ✅ ACTIVATE ANIMAL FACTS - Runs every 6 hours (4 posts/day)
+    workflow_scheduler.schedule_animal_facts(interval_hours=6, enabled=True)
+    print("✅ Animal Facts workflow scheduled: Every 6 hours")
+
+    
     print("✅ OMNI initialized successfully")
 
 
