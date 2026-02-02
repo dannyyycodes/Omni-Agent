@@ -98,9 +98,16 @@ class AnimalFactsWorkflow:
             return {"error": "Missing KIE_API_KEY", "fact": fact, "animal": animal['name']}
         
         print(f"🎥 Calling Kie.ai (Sora 2) - {duration}s video...")
+        
+        # Start video generation (don't wait for completion)
         try:
             task_id = self._kie_generate(kie_key, sora_prompt, duration=duration)
-            video_url = self._kie_poll(kie_key, task_id)
+            print(f"✅ Video generation started: Task ID {task_id}")
+            
+            # Poll with extended timeout (Sora 2 can take 2-5 minutes)
+            print("⏳ Waiting for video generation (this may take 2-5 minutes)...")
+            video_url = self._kie_poll(kie_key, task_id, max_wait=300)  # 5 minutes
+            
         except Exception as e:
             return {"error": f"Video generation failed: {str(e)}", "fact": fact}
         
@@ -385,12 +392,12 @@ The tone is captivating and authentic, showcasing the {animal['name']}'s natural
         
         raise Exception("Kie.ai generation failed after all retries")
     
-    def _kie_poll(self, key, task_id, max_wait=100):
-        """Poll for video completion - optimized for 120s timeout"""
+    def _kie_poll(self, key, task_id, max_wait=300):
+        """Poll for video completion - extended for Sora 2 (2-5 minutes)"""
         headers = {"Authorization": f"Bearer {key}"}
         
-        # Reduced polling: 20 attempts x 5s = 100s total
-        max_polls = 20
+        # Extended polling: 60 attempts x 5s = 300s (5 minutes)
+        max_polls = 60
         poll_interval = 5
         
         for i in range(max_polls):
