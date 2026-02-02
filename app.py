@@ -156,6 +156,12 @@ def chat(project_id=None):
     return render_template('chat.html', page='chat', project_id=project_id)
 
 
+@app.route('/simple')
+def simple_chat():
+    """Simple conversational interface - no code complexity"""
+    return render_template('simple_chat.html')
+
+
 @app.route('/settings')
 def settings_page():
     """Settings page"""
