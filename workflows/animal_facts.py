@@ -418,24 +418,41 @@ The tone is captivating and authentic, showcasing the {animal['name']}'s natural
                 
                 response_json = resp.json()
                 
-                # Debug: Print full response to understand structure
-                print(f"🔍 Full response: {response_json}")
-                
                 # Handle different response structures
                 if isinstance(response_json, dict):
                     # Try to get data from different possible locations
                     data = response_json.get('data', response_json)
                     
-                    # Get status from multiple possible fields
+                    # Get status/state from multiple possible fields
                     status = (data.get('status') or 
                              data.get('state') or 
                              data.get('taskStatus') or 
                              response_json.get('status') or 
                              response_json.get('state') or '').lower()
                     
-                    print(f"🎥 Status: {status}")
+                    # Get progress percentage
+                    progress = data.get('progress', 0)
                     
-                    # Check if completed
+                    print(f"🎥 Status: {status} | Progress: {progress}%")
+                    
+                    # Kie.ai specific: Check if progress=100 AND resultJson exists
+                    # (state stays 'waiting' even when done)
+                    result_json = data.get('resultJson', '')
+                    if progress == 100 and result_json:
+                        # Parse resultJson to get video URL
+                        try:
+                            import json
+                            result_data = json.loads(result_json) if isinstance(result_json, str) else result_json
+                            video_url = (result_data.get('videoUrl') or 
+                                       result_data.get('video_url') or 
+                                       result_data.get('url'))
+                            if video_url:
+                                logger.info(f"✅ Video ready (via progress=100): {video_url}")
+                                return video_url
+                        except Exception as e:
+                            logger.warning(f"Failed to parse resultJson: {e}")
+                    
+                    # Check if completed via status
                     if status in ['completed', 'success', 'done', 'finished', 'succeed']:
                         # Try multiple possible video URL fields
                         video_url = (data.get('videoUrl') or 
@@ -457,7 +474,7 @@ The tone is captivating and authentic, showcasing the {animal['name']}'s natural
                         logger.error(f"Kie.ai generation failed: {error_msg}")
                         raise Exception(f"Kie.ai generation failed: {error_msg}")
                     
-                    elif status in ['pending', 'processing', 'running', 'queued', 'in_progress']:
+                    elif status in ['pending', 'processing', 'running', 'queued', 'in_progress', 'waiting']:
                         # Still processing, continue loop
                         pass
                     else:
