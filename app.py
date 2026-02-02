@@ -99,6 +99,11 @@ def init_omni():
     # ✅ ACTIVATE ANIMAL FACTS - Runs every 6 hours (4 posts/day)
     workflow_scheduler.schedule_animal_facts(interval_hours=6, enabled=True)
     print("✅ Animal Facts workflow scheduled: Every 6 hours")
+    
+    # ✅ ACTIVATE DAILY EMAIL SUMMARY - One email per day at 9 AM UTC
+    from core.daily_emailer import init_daily_emailer
+    init_daily_emailer()
+    print("✅ Daily summary email scheduled: 9 AM UTC")
 
     
     print("✅ OMNI initialized successfully")
