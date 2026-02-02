@@ -127,7 +127,6 @@ class AnimalFactsWorkflow:
                 "message": "🧪 DRY RUN: Video generated successfully! Not posted to socials."
             }
         
-        blotato_key = os.environ.get('BLOTATO_API_KEY')
         caption = f"🐾 Did you know? {fact[:100]}... #animals #facts #wildlife #nature"
         
         if blotato_key:
@@ -389,36 +388,6 @@ The tone is captivating and authentic, showcasing the {animal['name']}'s natural
     def _kie_poll(self, key, task_id, max_wait=180):
         """Poll for video completion - increased timeout for Sora 2"""
         headers = {"Authorization": f"Bearer {key}"}
-        polls = max_wait // 5
-        
-        for i in range(polls):
-            try:
-                # Correct Kie.ai polling endpoint uses query parameter
-                resp = requests.get(
-                    f"https://api.kie.ai/api/v1/jobs/recordInfo?taskId={task_id}",
-                    headers=headers,
-                    timeout=30
-                )
-                
-                print(f"🎥 Poll {i+1}/{polls} response: {resp.status_code}")
-                
-                if resp.status_code != 200:
-                    print(f"🎥 Poll error: HTTP {resp.status_code}")
-                    time.sleep(5)
-                    continue
-                
-                response_json = resp.json()
-                
-                # Handle different response structures
-                if isinstance(response_json, dict):
-                    data = response_json.get('data', response_json)
-                    if data is None:
-                        data = response_json
-                else:
-                    data = {}
-                
-                status = str(data.get('status', '')).lower() if isinstance(data, dict) else ''
-                
                 print(f"🎥 Status: {status}")
                 
                 if status in ['completed', 'success', 'done', 'finished']:
