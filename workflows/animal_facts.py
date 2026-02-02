@@ -437,8 +437,9 @@ The tone is captivating and authentic, showcasing the {animal['name']}'s natural
                     
                     # Kie.ai specific: Check if progress=100 AND resultJson exists
                     # (state stays 'waiting' even when done)
+                    # Note: resultJson may be empty for a few polls after progress=100
                     result_json = data.get('resultJson', '')
-                    if progress == 100 and result_json:
+                    if result_json:  # If resultJson exists (regardless of progress)
                         # Parse resultJson to get video URL
                         try:
                             import json
@@ -447,7 +448,7 @@ The tone is captivating and authentic, showcasing the {animal['name']}'s natural
                                        result_data.get('video_url') or 
                                        result_data.get('url'))
                             if video_url:
-                                logger.info(f"✅ Video ready (via progress=100): {video_url}")
+                                logger.info(f"✅ Video ready (via resultJson): {video_url}")
                                 return video_url
                         except Exception as e:
                             logger.warning(f"Failed to parse resultJson: {e}")
