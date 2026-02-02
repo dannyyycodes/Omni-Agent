@@ -385,29 +385,54 @@ The tone is captivating and authentic, showcasing the {animal['name']}'s natural
         
         raise Exception("Kie.ai generation failed after all retries")
     
-    def _kie_poll(self, key, task_id, max_wait=180):
-        """Poll for video completion - increased timeout for Sora 2"""
+    def _kie_poll(self, key, task_id, max_wait=100):
+        """Poll for video completion - optimized for 120s timeout"""
         headers = {"Authorization": f"Bearer {key}"}
+        
+        # Reduced polling: 20 attempts x 5s = 100s total
+        max_polls = 20
+        poll_interval = 5
+        
+        for i in range(max_polls):
+            time.sleep(poll_interval)
+            
+            try:
+                resp = requests.get(
+                    f"https://api.kie.ai/api/v1/jobs/recordInfo?taskId={task_id}",
+                    headers=headers,
+                    timeout=30
+                )
+                
+                print(f"🎥 Poll {i+1}/{max_polls} response: {resp.status_code}")
+                
+                if resp.status_code != 200:
+                    print(f"🎥 Poll error: HTTP {resp.status_code}")
+                    continue
+                
+                response_json = resp.json()
+                data = response_json.get('data', response_json) if isinstance(response_json, dict) else {}
+                status = str(data.get('status', '')).lower() if isinstance(data, dict) else ''
+                
                 print(f"🎥 Status: {status}")
                 
                 if status in ['completed', 'success', 'done', 'finished']:
-                    video_url = (data.get('result_url') or data.get('video_url') or 
-                                data.get('output_url') or data.get('url'))
+                    video_url = data.get('videoUrl') or data.get('video_url') or data.get('url')
                     if video_url:
-                        print(f"🎥 Video ready: {video_url}")
+                        logger.info(f"✅ Video ready: {video_url}")
                         return video_url
-                    raise Exception(f"Completed but no video URL: {data}")
+                    else:
+                        logger.warning("Video marked complete but no URL found")
+                        
                 elif status in ['failed', 'error']:
-                    raise Exception(f"Generation failed: {data.get('error', data)}")
-                elif status in ['pending', 'processing', 'running', 'queued', '']:
-                    pass  # Still processing, continue polling
+                    error_msg = data.get('error', 'Unknown error')
+                    logger.error(f"Kie.ai generation failed: {error_msg}")
+                    raise Exception(f"Kie.ai generation failed: {error_msg}")
                     
             except requests.exceptions.RequestException as e:
-                print(f"🎥 Poll error: {e}")
-            
-            time.sleep(5)
+                logger.warning(f"Poll {i+1} request failed: {str(e)}")
+                continue
         
-        raise Exception("Timed out waiting for video generation")
+        raise Exception(f"Video generation timed out after {max_wait}s")
     
     def _compose_video(self, video_url, fact_text, animal_name):
         """
