@@ -47,6 +47,12 @@ try:
 except:
     HAS_PROCESS_VIDEO = False
 
+try:
+    from api.diagnostic import bp as diagnostic_bp
+    HAS_DIAGNOSTIC = True
+except:
+    HAS_DIAGNOSTIC = False
+
 # ============================================================
 # FLASK APP SETUP
 # ============================================================
@@ -2550,6 +2556,10 @@ if HAS_SIMPLE_VIDEO:
 if HAS_PROCESS_VIDEO:
     app.register_blueprint(process_video_bp)
     print("✅ Video processing API registered")
+
+if HAS_DIAGNOSTIC:
+    app.register_blueprint(diagnostic_bp)
+    print("✅ Diagnostic API registered")
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
