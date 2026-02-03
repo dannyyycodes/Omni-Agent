@@ -140,9 +140,11 @@ ACTION: Over {duration} seconds, the {animal_name} {habitat_data['specific_scene
 
 LIGHTING: Natural {habitat_data['time_of_day']} lighting - accurate sun position, realistic shadows, proper color temperature. Light interacts correctly with all surfaces.
 
+AUDIO: Natural ambient sounds ONLY - gentle wind, water sounds, distant nature ambience. Subtle, awe-inspiring background music is acceptable. ABSOLUTELY NO VOICEOVER. NO NARRATION. NO HUMAN SPEECH. NO TALKING. The video must be silent except for natural environmental sounds and optional subtle music.
+
 QUALITY: Documentary-grade footage for BBC Earth/National Geographic. NO glitches, NO morphing, NO impossible physics. Every frame is believable and could be mistaken for real wildlife footage.
 
-CRITICAL: The {animal_name} MUST stay in its correct {habitat_data['habitat_type']} throughout. NO snow for tropical animals, NO desert for aquatic animals. SCIENTIFICALLY ACCURATE and VISUALLY BELIEVABLE."""
+CRITICAL: The {animal_name} MUST stay in its correct {habitat_data['habitat_type']} throughout. NO snow for tropical animals, NO desert for aquatic animals. SCIENTIFICALLY ACCURATE and VISUALLY BELIEVABLE. NO VOICEOVER OR NARRATION WHATSOEVER."""
 
     return prompt
 
