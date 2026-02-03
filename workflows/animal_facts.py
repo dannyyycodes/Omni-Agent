@@ -242,6 +242,30 @@ The prompt_style should describe a cinematic action the animal does."""
     
     def _build_sora_prompt(self, animal, duration=10):
         """
+        Build HYPER-REALISTIC Sora 2 prompt with AI-powered habitat matching.
+        Uses the improved prompt builder to ensure correct natural environments.
+        """
+        from utils.sora_prompt_builder import build_hyper_realistic_sora_prompt
+        
+        try:
+            prompt = build_hyper_realistic_sora_prompt(
+                animal_name=animal['name'],
+                model_router=self.model_router,
+                duration=duration
+            )
+            logger.info(f"✅ Generated hyper-realistic Sora prompt for {animal['name']}")
+            return prompt
+        except Exception as e:
+            logger.error(f"Prompt generation failed: {e}, using fallback")
+            # Simple fallback if the new system fails
+            return f"""HYPER-REALISTIC WILDLIFE DOCUMENTARY: A {animal['name']} in its natural habitat. 
+            
+Shot on RED camera with BBC Earth documentary cinematography. The {animal['name']} is anatomically perfect with realistic texture and natural coloration. Crystal clear 8K resolution.
+            
+The animal moves naturally over {duration} seconds with scientifically accurate behavior. Environment is photorealistic with proper lighting and shadows. 
+            
+Documentary-grade footage suitable for National Geographic. NO glitches, NO morphing, NO impossible physics. Every frame is believable."""
+        """
         Build production-grade Sora 2 prompt matching n8n workflow quality.
         Follows the same structure: Scene Setup, Camera, Action, Physical Realism, Lighting, Audio, Tone.
         """
