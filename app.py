@@ -787,6 +787,47 @@ def api_get_task_status(task_id):
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/tasks', methods=['GET'])
+def api_list_tasks():
+    """List all video tasks"""
+    try:
+        from core.memory import MemoryManager, PendingVideoTask, HAS_SQLALCHEMY
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        
+        if not HAS_SQLALCHEMY:
+            return jsonify({'error': 'Database not available', 'tasks': []}), 200
+        
+        db_url = get_db_url()
+        engine = create_engine(db_url)
+        Session = sessionmaker(bind=engine)
+        session = Session()
+        
+        # Get all tasks, most recent first
+        tasks = session.query(PendingVideoTask).order_by(
+            PendingVideoTask.created_at.desc()
+        ).limit(50).all()
+        
+        result = []
+        for task in tasks:
+            result.append({
+                'task_id': task.task_id,
+                'status': task.status,
+                'animal': task.animal_name,
+                'fact': task.fact_text[:100] + '...' if task.fact_text and len(task.fact_text) > 100 else task.fact_text,
+                'video_url': task.video_url,
+                'created_at': task.created_at.isoformat() if task.created_at else None,
+                'completed_at': task.completed_at.isoformat() if task.completed_at else None,
+                'error': task.error_message
+            })
+        
+        session.close()
+        return jsonify({'tasks': result, 'count': len(result)})
+        
+    except Exception as e:
+        return jsonify({'error': str(e), 'tasks': []}), 200
+
+
 @app.route('/health')
 def health():
     """Health check"""
