@@ -28,6 +28,13 @@ from web_agent.browser import WebAgent
 from storage.files import FileManager
 from core.scheduler import init_scheduler, get_scheduler
 
+# Import API blueprints
+try:
+    from api.import_videos import bp as import_videos_bp
+    HAS_IMPORT_VIDEOS = True
+except:
+    HAS_IMPORT_VIDEOS = False
+
 # ============================================================
 # FLASK APP SETUP
 # ============================================================
