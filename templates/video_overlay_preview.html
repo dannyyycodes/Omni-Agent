@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Text Overlay Preview</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 40px;
+            font-size: 2.5em;
+        }
+
+        .preview-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .phone-mockup {
+            background: white;
+            border-radius: 30px;
+            padding: 15px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            margin: 0 auto;
+            max-width: 360px;
+        }
+
+        .screen {
+            background: #000;
+            border-radius: 20px;
+            overflow: hidden;
+            aspect-ratio: 9 / 16;
+            position: relative;
+        }
+
+        .text-bar {
+            background: white;
+            padding: 20px;
+            text-align: center;
+            height: 200px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .animal-name {
+            font-size: 24px;
+            font-weight: bold;
+            color: #000;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .fact-text {
+            font-size: 16px;
+            color: #333;
+            line-height: 1.4;
+            max-width: 90%;
+        }
+
+        .video-area {
+            background: linear-gradient(180deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            height: calc(100% - 200px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 14px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .video-area::before {
+            content: '';
+            position: absolute;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
+            animation: pulse 3s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                transform: scale(1);
+                opacity: 0.5;
+            }
+
+            50% {
+                transform: scale(1.1);
+                opacity: 0.8;
+            }
+        }
+
+        .info-box {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .info-box h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+
+        .info-box ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .info-box li {
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .info-box li:last-child {
+            border-bottom: none;
+        }
+
+        .checkmark {
+            color: #4CAF50;
+            margin-right: 10px;
+        }
+
+        .example-section {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-top: 30px;
+        }
+
+        .example-section h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+        }
+
+        .example-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+
+        .example-item strong {
+            color: #667eea;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🎬 Animal Facts Video Preview</h1>
+
+        <div class="preview-grid">
+            <div class="phone-mockup">
+                <div class="screen">
+                    <div class="text-bar">
+                        <div class="animal-name">Mantis Shrimp</div>
+                        <div class="fact-text">Did you know mantis shrimp can see 16 types of color receptors compared
+                            to humans' 3?</div>
+                    </div>
+                    <div class="video-area">
+                        <span>← VIDEO CONTENT →</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="phone-mockup">
+                <div class="screen">
+                    <div class="text-bar">
+                        <div class="animal-name">Peacock</div>
+                        <div class="fact-text">Did you know peacocks can shake their tail feathers at frequencies too
+                            low for humans to hear?</div>
+                    </div>
+                    <div class="video-area">
+                        <span>← VIDEO CONTENT →</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="phone-mockup">
+                <div class="screen">
+                    <div class="text-bar">
+                        <div class="animal-name">Octopus</div>
+                        <div class="fact-text">Did you know octopuses have three hearts and blue blood?</div>
+                    </div>
+                    <div class="video-area">
+                        <span>← VIDEO CONTENT →</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="info-box">
+            <h2>✨ How It Works</h2>
+            <ul>
+                <li><span class="checkmark">✓</span> <strong>White Bar at Top:</strong> 200px height with animal name +
+                    fact</li>
+                <li><span class="checkmark">✓</span> <strong>Video Below:</strong> 1720px height with actual footage
+                </li>
+                <li><span class="checkmark">✓</span> <strong>Total Size:</strong> 1080x1920 (perfect 9:16 for
+                    TikTok/Instagram)</li>
+                <li><span class="checkmark">✓</span> <strong>Text:</strong> Black text on white background for maximum
+                    readability</li>
+                <li><span class="checkmark">✓</span> <strong>Composition:</strong> Done with FFmpeg - professional
+                    quality</li>
+            </ul>
+        </div>
+
+        <div class="example-section">
+            <h2>📋 Technical Details</h2>
+
+            <div class="example-item">
+                <strong>FFmpeg Command:</strong><br>
+                <code style="font-size: 12px; color: #666;">
+                    ffmpeg -i video.mp4 -i text_bar.png -filter_complex "[0:v]scale=1080:920[vid];[1:v]scale=1080:200[bar];[bar][vid]vstack" output.mp4
+                </code>
+            </div>
+
+            <div class="example-item">
+                <strong>Text Bar Creation:</strong><br>
+                • White background (RGB: 255, 255, 255)<br>
+                • Black text (RGB: 0, 0, 0)<br>
+                • Font: DejaVu Sans Bold, 28px<br>
+                • Centered alignment<br>
+                • Auto text wrapping
+            </div>
+
+            <div class="example-item">
+                <strong>Video Processing:</strong><br>
+                1. Download Sora-generated video<br>
+                2. Create text bar PNG with fact<br>
+                3. Stack text bar above video<br>
+                4. Export as 1080x1920 MP4<br>
+                5. Upload to social media
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

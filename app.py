@@ -166,12 +166,18 @@ def dashboard():
 
 @app.route('/videos')
 def video_viewer():
-    """Video viewer page"""
+    """Video viewer page with task status"""
     return render_template('video_viewer.html')
 
 
-@app.route('/api/refresh-stats', methods=['POST'])
-def refresh_stats():
+@app.route('/preview/video-overlay')
+def preview_video_overlay():
+    """Show preview of how videos with text overlays look"""
+    return render_template('video_overlay_preview.html')
+
+
+@app.route('/api/tasks/<task_id>', methods=['GET'])
+def refresh_stats(task_id): # task_id parameter added as per new route
     """Force refresh social stats"""
     if 'social_tracker' not in globals():
         from core.social_tracker import SocialTracker
