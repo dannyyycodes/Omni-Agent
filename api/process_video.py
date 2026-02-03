@@ -7,7 +7,7 @@ from flask import Blueprint, send_file, jsonify, request
 import os
 import tempfile
 import requests
-from utils.video_composer_simple import VideoComposerSimple
+from utils.video_composer_free import VideoComposerFree
 
 bp = Blueprint('process_video', __name__)
 
@@ -36,8 +36,8 @@ def process_video():
         
         print(f"🎬 Processing video for {animal}...")
         
-        # Use simple, robust video composer
-        composer = VideoComposerSimple()
+        # Use FREE ImageMagick-based video composer
+        composer = VideoComposerFree()
         output_path = composer.add_fact_overlay(
             video_url=video_url,
             fact_text=fact,
