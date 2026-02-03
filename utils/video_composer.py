@@ -65,44 +65,83 @@ class VideoComposer:
         
         return temp_path
     
-    def _create_text_bar(self, fact_text, title, width=1080, height=200):
+    def _create_text_bar(self, fact_text, title, width=1080, height=300):
         """
-        Create a white bar image with the fact text.
+        Create a professional branded text bar with emojis and @howanimalslove
         Returns path to the PNG file.
         """
-        # Create white background
+        # Create white background with more height for better readability
         img = Image.new('RGB', (width, height), color='white')
         draw = ImageDraw.Draw(img)
         
-        # Try to load a nice font, fall back to default
+        # Try to load nice fonts with BIGGER sizes
         try:
-            # Common fonts on Linux/Railway
             font_paths = [
                 '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
                 '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf',
                 '/usr/share/fonts/TTF/DejaVuSans-Bold.ttf',
             ]
-            font = None
+            title_font = None
+            fact_font = None
+            brand_font = None
+            
             for path in font_paths:
                 if os.path.exists(path):
-                    font = ImageFont.truetype(path, 28)
+                    title_font = ImageFont.truetype(path, 56)  # Much bigger!
+                    fact_font = ImageFont.truetype(path, 38)   # Bigger fact text
+                    brand_font = ImageFont.truetype(path, 32)  # Brand text
                     break
-            if not font:
-                font = ImageFont.load_default()
+            
+            if not title_font:
+                title_font = ImageFont.load_default()
+                fact_font = ImageFont.load_default()
+                brand_font = ImageFont.load_default()
         except:
-            font = ImageFont.load_default()
+            title_font = ImageFont.load_default()
+            fact_font = ImageFont.load_default()
+            brand_font = ImageFont.load_default()
         
-        # Wrap text to fit width
-        wrapped_text = self._wrap_text(fact_text, font, width - 60)
+        # Add emoji to title (animal-specific)
+        animal_emojis = {
+            'octopus': '🐙',
+            'mantis shrimp': '🦐',
+            'peacock': '🦚',
+            'lion': '🦁',
+            'elephant': '🐘',
+            'dolphin': '🐬',
+            'shark': '🦈',
+            'whale': '🐋',
+            'penguin': '🐧',
+            'eagle': '🦅',
+        }
         
-        # Draw text centered
-        text_y = 30
+        emoji = animal_emojis.get(title.lower(), '🐾')
+        title_with_emoji = f"{emoji} {title.upper()} {emoji}"
+        
+        # Draw title (centered, top)
+        title_bbox = draw.textbbox((0, 0), title_with_emoji, font=title_font)
+        title_width = title_bbox[2] - title_bbox[0]
+        title_x = (width - title_width) // 2
+        draw.text((title_x, 20), title_with_emoji, fill='black', font=title_font)
+        
+        # Wrap fact text to fit width
+        wrapped_text = self._wrap_text(fact_text, fact_font, width - 80)
+        
+        # Draw fact text (centered, below title)
+        text_y = 95
         for line in wrapped_text:
-            bbox = draw.textbbox((0, 0), line, font=font)
-            text_width = bbox[2] - bbox[0]
-            text_x = (width - text_width) // 2
-            draw.text((text_x, text_y), line, fill='black', font=font)
-            text_y += bbox[3] - bbox[1] + 10
+            bbox = draw.textbbox((0, 0), line, font=fact_font)
+            line_width = bbox[2] - bbox[0]
+            text_x = (width - line_width) // 2
+            draw.text((text_x, text_y), line, fill='#333333', font=fact_font)
+            text_y += bbox[3] - bbox[1] + 12
+        
+        # Add branding at bottom of text bar
+        brand_text = "📱 @howanimalslove"
+        brand_bbox = draw.textbbox((0, 0), brand_text, font=brand_font)
+        brand_width = brand_bbox[2] - brand_bbox[0]
+        brand_x = (width - brand_width) // 2
+        draw.text((brand_x, height - 55), brand_text, fill='#667eea', font=brand_font)
         
         # Save
         bar_path = os.path.join(self.output_dir, 'text_bar.png')
@@ -140,11 +179,11 @@ class VideoComposer:
         """
         Use FFmpeg to stack text bar on top of video.
         
-        Final output: 1080x1120 (200px bar + 920px video)
+        Final output: 1080x1920 (300px bar + 1620px video)
         """
         # FFmpeg command to:
-        # 1. Scale video to 1080x920 (cropped to fit)
-        # 2. Stack text bar (1080x200) on top
+        # 1. Scale video to 1080x1620 (cropped to fit)
+        # 2. Stack text bar (1080x300) on top
         # 3. Output combined video
         
         cmd = [
@@ -152,8 +191,8 @@ class VideoComposer:
             '-i', video_path,
             '-i', text_bar_path,
             '-filter_complex',
-            '[0:v]scale=1080:920:force_original_aspect_ratio=increase,crop=1080:920[vid];'
-            '[1:v]scale=1080:200[bar];'
+            '[0:v]scale=1080:1620:force_original_aspect_ratio=increase,crop=1080:1620[vid];'
+            '[1:v]scale=1080:300[bar];'
             '[bar][vid]vstack=inputs=2[out]',
             '-map', '[out]',
             '-map', '0:a?',
