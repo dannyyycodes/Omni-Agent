@@ -121,6 +121,12 @@ def before_request():
 
 @app.route('/')
 def index():
+    """Redirect to video viewer"""
+    return redirect('/videos')
+
+
+@app.route('/dashboard')
+def dashboard():
     """Main dashboard"""
     # 1. Get Social Stats
     social_stats = None
@@ -145,6 +151,12 @@ def index():
                          page='dashboard', 
                          stats=social_stats,
                          active_workflows=active_count)
+
+
+@app.route('/videos')
+def video_viewer():
+    """Video viewer page"""
+    return render_template('video_viewer.html')
 
 
 @app.route('/api/refresh-stats', methods=['POST'])
@@ -732,6 +744,45 @@ def api_scheduler_logs():
         limit = int(request.args.get('limit', 20))
         logs = workflow_scheduler.get_logs(limit)
         return jsonify({'logs': logs})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/tasks/<task_id>', methods=['GET'])
+def api_get_task_status(task_id):
+    """Get status of a pending video task"""
+    try:
+        from core.memory import MemoryManager, PendingVideoTask, HAS_SQLALCHEMY
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        
+        if not HAS_SQLALCHEMY:
+            return jsonify({'error': 'Database not available'}), 500
+        
+        db_url = get_db_url()
+        engine = create_engine(db_url)
+        Session = sessionmaker(bind=engine)
+        session = Session()
+        
+        task = session.query(PendingVideoTask).filter_by(task_id=task_id).first()
+        
+        if not task:
+            return jsonify({'error': 'Task not found'}), 404
+        
+        result = {
+            'task_id': task.task_id,
+            'status': task.status,
+            'animal': task.animal_name,
+            'fact': task.fact_text,
+            'video': task.video_url,
+            'created_at': task.created_at.isoformat() if task.created_at else None,
+            'completed_at': task.completed_at.isoformat() if task.completed_at else None,
+            'error': task.error_message
+        }
+        
+        session.close()
+        return jsonify(result)
+        
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
