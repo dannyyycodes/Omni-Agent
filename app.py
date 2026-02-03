@@ -40,6 +40,17 @@ app.config['UPLOAD_FOLDER'] = '/tmp/omni_uploads'
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 # ============================================================
+# INITIALIZE DATABASE TABLES
+# ============================================================
+
+# Initialize database tables before anything else
+try:
+    from init_db import init_database
+    init_database()
+except Exception as e:
+    print(f"⚠️  Database initialization warning: {e}")
+
+# ============================================================
 # INITIALIZE OMNI COMPONENTS
 # ============================================================
 
