@@ -7,7 +7,7 @@ from flask import Blueprint, send_file, jsonify, request
 import os
 import tempfile
 import requests
-from utils.video_composer import VideoComposer
+from utils.video_composer_v2 import VideoComposerV2
 
 bp = Blueprint('process_video', __name__)
 
@@ -36,8 +36,8 @@ def process_video():
         
         print(f"🎬 Processing video for {animal}...")
         
-        # Use VideoComposer to add text overlay
-        composer = VideoComposer()
+        # Use VideoComposerV2 to add text overlay with FFmpeg drawtext
+        composer = VideoComposerV2()
         output_path = composer.add_fact_overlay(
             video_url=video_url,
             fact_text=fact,
