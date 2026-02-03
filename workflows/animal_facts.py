@@ -135,6 +135,7 @@ class AnimalFactsWorkflow:
             }
         
         caption = f"🐾 Did you know? {fact[:100]}... #animals #facts #wildlife #nature"
+        blotato_key = os.environ.get('BLOTATO_API_KEY')
         
         if blotato_key:
             try:
