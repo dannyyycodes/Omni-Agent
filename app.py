@@ -41,6 +41,12 @@ try:
 except:
     HAS_SIMPLE_VIDEO = False
 
+try:
+    from api.process_video import bp as process_video_bp
+    HAS_PROCESS_VIDEO = True
+except:
+    HAS_PROCESS_VIDEO = False
+
 # ============================================================
 # FLASK APP SETUP
 # ============================================================
@@ -2540,6 +2546,10 @@ if HAS_IMPORT_VIDEOS:
 if HAS_SIMPLE_VIDEO:
     app.register_blueprint(simple_video_bp)
     print("✅ Simple video preview registered")
+
+if HAS_PROCESS_VIDEO:
+    app.register_blueprint(process_video_bp)
+    print("✅ Video processing API registered")
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
