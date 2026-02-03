@@ -63,6 +63,16 @@ class VideoComposerFree:
         fact_line1 = ' '.join(words[:mid])
         fact_line2 = ' '.join(words[mid:])
         
+        # Check if ImageMagick is available
+        try:
+            check_result = subprocess.run(['convert', '--version'], capture_output=True, timeout=5)
+            if check_result.returncode != 0:
+                print("⚠️ ImageMagick not available, using PIL fallback")
+                return self._create_pil_overlay(title, fact_text)
+        except Exception as e:
+            print(f"⚠️ ImageMagick check failed: {e}, using PIL fallback")
+            return self._create_pil_overlay(title, fact_text)
+        
         # ImageMagick command to create beautiful text overlay
         cmd = [
             'convert',
@@ -85,10 +95,12 @@ class VideoComposerFree:
             overlay_path
         ]
         
+        print(f"Running ImageMagick command...")
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
         
         if result.returncode != 0:
             print(f"⚠️ ImageMagick error: {result.stderr}")
+            print(f"⚠️ Using PIL fallback instead")
             # Fallback to PIL if ImageMagick fails
             return self._create_pil_overlay(title, fact_text)
         
