@@ -35,6 +35,12 @@ try:
 except:
     HAS_IMPORT_VIDEOS = False
 
+try:
+    from api.simple_video import bp as simple_video_bp
+    HAS_SIMPLE_VIDEO = True
+except:
+    HAS_SIMPLE_VIDEO = False
+
 # ============================================================
 # FLASK APP SETUP
 # ============================================================
@@ -2530,6 +2536,10 @@ MEMORY_HTML = r'''
 if HAS_IMPORT_VIDEOS:
     app.register_blueprint(import_videos_bp)
     print("✅ Import videos API registered")
+
+if HAS_SIMPLE_VIDEO:
+    app.register_blueprint(simple_video_bp)
+    print("✅ Simple video preview registered")
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
