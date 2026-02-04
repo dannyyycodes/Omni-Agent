@@ -15,9 +15,14 @@
             <p id="last-run-text">Checking last run...</p>
         </div>
     </div>
-    <button class="btn btn-primary btn-large" id="run-now-btn" onclick="runWorkflowNow()">
-        <i data-lucide="play"></i> Run Now
-    </button>
+    <div class="btn-group">
+        <button class="btn btn-secondary btn-large" id="test-btn" onclick="runWorkflowNow(true)">
+            <i data-lucide="flask-conical"></i> Test (No Post)
+        </button>
+        <button class="btn btn-primary btn-large" id="run-now-btn" onclick="runWorkflowNow(false)">
+            <i data-lucide="play"></i> Run & Post
+        </button>
+    </div>
 </div>
 
 <!-- Quick Stats -->
@@ -449,6 +454,20 @@
         cursor: not-allowed;
     }
 
+    .btn-secondary {
+        background: rgba(255, 255, 255, 0.15);
+        border: 1px solid var(--glass-border);
+    }
+
+    .btn-secondary:hover {
+        background: rgba(255, 255, 255, 0.2);
+    }
+
+    .btn-group {
+        display: flex;
+        gap: 12px;
+    }
+
     @media (max-width: 768px) {
         .status-hero {
             flex-direction: column;
@@ -458,6 +477,16 @@
 
         .status-main {
             flex-direction: column;
+        }
+
+        .btn-group {
+            flex-direction: column;
+            width: 100%;
+        }
+
+        .btn-group .btn {
+            width: 100%;
+            justify-content: center;
         }
 
         .stats-row {
@@ -675,21 +704,33 @@
         }
     }
 
-    async function runWorkflowNow() {
-        const btn = document.getElementById('run-now-btn');
+    async function runWorkflowNow(dryRun = false) {
+        const runBtn = document.getElementById('run-now-btn');
+        const testBtn = document.getElementById('test-btn');
         const status = document.getElementById('run-status');
 
-        btn.disabled = true;
-        btn.innerHTML = '<i data-lucide="loader"></i> Starting...';
+        // Disable both buttons
+        runBtn.disabled = true;
+        testBtn.disabled = true;
+
+        const actionText = dryRun ? 'Testing (no post)...' : 'Starting...';
+        if (dryRun) {
+            testBtn.innerHTML = '<i data-lucide="loader"></i> ' + actionText;
+        } else {
+            runBtn.innerHTML = '<i data-lucide="loader"></i> ' + actionText;
+        }
+
         status.style.display = 'block';
         status.className = 'glass-panel run-status';
-        status.innerHTML = 'Starting video generation...';
+        status.innerHTML = dryRun
+            ? 'Generating test video (will NOT post to social media)...'
+            : 'Generating video and posting to social media...';
 
         try {
             const res = await fetch('/api/animal-facts/run', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({})
+                body: JSON.stringify({ dry_run: dryRun })
             });
             const data = await res.json();
 
@@ -698,19 +739,29 @@
                 status.innerHTML = `<strong>Error:</strong> ${data.error}`;
             } else {
                 status.className = 'glass-panel run-status success';
-                status.innerHTML = `<strong>Started!</strong> Creating video for: ${data.animal || 'Random animal'}`;
+                const modeText = dryRun ? '(Test - Not Posted)' : '(Will post to socials)';
+                status.innerHTML = `
+                    <strong>Video generating!</strong> ${modeText}<br>
+                    <strong>Animal:</strong> ${data.animal || 'Random'}<br>
+                    <strong>Fact:</strong> ${data.fact ? data.fact.substring(0, 100) + '...' : 'Generating...'}<br>
+                    <em>Video takes 2-5 minutes to generate. Check "Recent Videos" below when done.</em>
+                `;
+                // Refresh after delay
                 setTimeout(() => {
                     loadStatus();
                     loadVideos();
-                }, 5000);
+                }, 10000);
             }
         } catch (e) {
             status.className = 'glass-panel run-status error';
             status.innerHTML = `<strong>Failed:</strong> ${e.message}`;
         }
 
-        btn.disabled = false;
-        btn.innerHTML = '<i data-lucide="play"></i> Run Now';
+        // Re-enable buttons
+        runBtn.disabled = false;
+        testBtn.disabled = false;
+        runBtn.innerHTML = '<i data-lucide="play"></i> Run & Post';
+        testBtn.innerHTML = '<i data-lucide="flask-conical"></i> Test (No Post)';
         lucide.createIcons();
     }
 </script>
