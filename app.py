@@ -216,14 +216,17 @@ def preview_video_overlay():
     return render_template('video_overlay_preview.html')
 
 
-@app.route('/api/tasks/<task_id>', methods=['GET'])
-def refresh_stats(task_id): # task_id parameter added as per new route
+@app.route('/api/refresh-stats', methods=['POST'])
+def refresh_stats():
     """Force refresh social stats"""
+    task_id = request.json.get('task_id') if request.json else None
+    task = Task.query.get(task_id) if task_id else None
+
     if 'social_tracker' not in globals():
         from core.social_tracker import SocialTracker
         global social_tracker
         social_tracker = SocialTracker()
-        
+
     new_stats = social_tracker.update_all()
     return jsonify(new_stats)
 
