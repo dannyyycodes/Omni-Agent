@@ -166,11 +166,33 @@
         </div>
 
         <div class="card">
-            <h2>Recent Videos</h2>
+            <h2>📂 Video Gallery (static/videos)</h2>
+            {% if videos %}
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px;">
+                {% for video in videos %}
+                <div class="video-item" style="background: #f9f9f9; padding: 10px; border-radius: 8px;">
+                    <video controls preload="metadata" style="width: 100%; border-radius: 8px;">
+                        <source src="{{ url_for('static', filename='videos/' + video) }}" type="video/mp4">
+                    </video>
+                    <p style="margin-top: 10px; word-break: break-all; font-size: 0.9em;">
+                        <strong>{{ video }}</strong><br>
+                        <a href="{{ url_for('static', filename='videos/' + video) }}" target="_blank"
+                            style="color: #667eea; text-decoration: none;">⬇️ Download / Open</a>
+                    </p>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p style="color: #666; text-align: center; padding: 20px;">No videos found in static/videos folder yet.</p>
+            {% endif %}
+        </div>
+
+        <div class="card">
+            <h2>Recent Tasks (Scheduler)</h2>
             <div id="recentVideos">
                 <div class="loading">
                     <div class="spinner"></div>
-                    <p style="margin-top: 15px; color: #666;">Loading recent videos...</p>
+                    <p style="margin-top: 15px; color: #666;">Loading recent tasks...</p>
                 </div>
             </div>
         </div>

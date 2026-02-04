@@ -191,8 +191,21 @@ def dashboard():
 
 @app.route('/videos')
 def video_viewer():
-    """Video viewer page with task status"""
-    return render_template('video_viewer.html')
+    """Video viewer page with task status and file browser"""
+    # List files in static/videos
+    video_dir = os.path.join(app.root_path, 'static', 'videos')
+    os.makedirs(video_dir, exist_ok=True)
+    
+    videos = []
+    try:
+        files = sorted(os.listdir(video_dir), key=lambda x: os.path.getmtime(os.path.join(video_dir, x)), reverse=True)
+        for f in files:
+            if f.endswith('.mp4'):
+                videos.append(f)
+    except Exception as e:
+        print(f"Error listing videos: {e}")
+        
+    return render_template('video_viewer.html', videos=videos)
 
 
 @app.route('/preview/video-overlay')
