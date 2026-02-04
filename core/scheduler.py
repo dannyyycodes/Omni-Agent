@@ -46,6 +46,18 @@ class WorkflowScheduler:
         if self.scheduler.running:
             return
         
+        # Add background video processor (runs every 30 seconds)
+        from core.video_task_processor import process_pending_videos
+        self.scheduler.add_job(
+            func=process_pending_videos,
+            trigger=IntervalTrigger(seconds=30),
+            id='video_processor',
+            replace_existing=True,
+            name='Video Task Processor',
+            max_instances=1
+        )
+        print("✅ Background video processor scheduled (every 30s)")
+        
         # Add all enabled workflows
         for job_id, config in self.scheduled_jobs.items():
             if config.get('enabled', False):
@@ -76,16 +88,19 @@ class WorkflowScheduler:
             )
     
     def _run_animal_facts(self):
-        """Execute the Animal Facts workflow."""
+        """Execute the Animal Facts workflow (ASYNC VERSION)."""
         try:
             from workflows.animal_facts import AnimalFactsWorkflow
+            from core.async_workflow_wrapper import AsyncWorkflowWrapper
             
             if not os.environ.get('KIE_API_KEY'):
                 print("⚠️ Scheduled Animal Facts skipped - missing KIE_API_KEY")
                 return {'status': 'skipped', 'reason': 'missing API key'}
             
+            # Use async wrapper
             workflow = AnimalFactsWorkflow(self.api_hub, self.model_router)
-            result = workflow.run()
+            async_wrapper = AsyncWorkflowWrapper(workflow)
+            result = async_wrapper.run_async()
             
             # Log the result
             self._log_execution('animal_facts', result)

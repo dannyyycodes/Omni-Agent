@@ -4,6 +4,8 @@ Generates monetization-ready short-form content with:
 1. AI-generated animal facts
 2. Sora 2 video via Kie.ai
 3. Text overlay composition (white bar + video)
+
+Production-grade with error handling, logging, and self-healing.
 """
 
 import os
@@ -11,7 +13,15 @@ import json
 import random
 import time
 import requests
+import logging
 from datetime import datetime
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 class AnimalFactsWorkflow:
     def __init__(self, api_hub, model_router):
@@ -35,17 +45,31 @@ class AnimalFactsWorkflow:
     
     def run(self, animal_id=None, dry_run=False, duration=10):
         """
-        Execute the full workflow.
+        Execute the full workflow with error handling and logging.
         
         Args:
             animal_id: Optional specific animal to use
             dry_run: If True, generate video but skip posting to socials
             duration: Video length in seconds (5, 10, 15, or 20)
         """
+        logger.info("🎬 Starting Animal Facts V2 Workflow...")
         print("🎬 Starting Animal Facts V2 Workflow...")
         if dry_run:
+            logger.info("🧪 DRY RUN MODE - Video will be generated but NOT posted")
             print("🧪 DRY RUN MODE - Video will be generated but NOT posted")
         
+        try:
+            return self._run_with_error_handling(animal_id, dry_run, duration)
+        except Exception as e:
+            logger.error(f"Workflow failed: {str(e)}", exc_info=True)
+            return {
+                "status": "error",
+                "error": str(e),
+                "message": "Workflow encountered an error. Check logs for details."
+            }
+    
+    def _run_with_error_handling(self, animal_id, dry_run, duration):
+        """Internal run method with detailed error handling"""
         # 1. Pick an Animal - DYNAMICALLY via AI (unlimited variety!)
         if animal_id:
             # User requested specific animal
@@ -74,9 +98,16 @@ class AnimalFactsWorkflow:
             return {"error": "Missing KIE_API_KEY", "fact": fact, "animal": animal['name']}
         
         print(f"🎥 Calling Kie.ai (Sora 2) - {duration}s video...")
+        
+        # Start video generation (don't wait for completion)
         try:
             task_id = self._kie_generate(kie_key, sora_prompt, duration=duration)
-            video_url = self._kie_poll(kie_key, task_id)
+            print(f"✅ Video generation started: Task ID {task_id}")
+            
+            # Poll with extended timeout (Sora 2 can take 2-5 minutes)
+            print("⏳ Waiting for video generation (this may take 2-5 minutes)...")
+            video_url = self._kie_poll(kie_key, task_id, max_wait=300)  # 5 minutes
+            
         except Exception as e:
             return {"error": f"Video generation failed: {str(e)}", "fact": fact}
         
@@ -103,8 +134,8 @@ class AnimalFactsWorkflow:
                 "message": "🧪 DRY RUN: Video generated successfully! Not posted to socials."
             }
         
-        blotato_key = os.environ.get('BLOTATO_API_KEY')
         caption = f"🐾 Did you know? {fact[:100]}... #animals #facts #wildlife #nature"
+        blotato_key = os.environ.get('BLOTATO_API_KEY')
         
         if blotato_key:
             try:
@@ -210,75 +241,277 @@ The prompt_style should describe a cinematic action the animal does."""
 
     
     def _build_sora_prompt(self, animal, duration=10):
-        """Build the Sora 2 video generation prompt - HYPER-REALISTIC for maximum virality"""
+        """
+        Build HYPER-REALISTIC Sora 2 prompt with AI-powered habitat matching.
+        Uses the improved prompt builder to ensure correct natural environments.
+        """
+        from utils.sora_prompt_builder import build_hyper_realistic_sora_prompt
         
-        # Ultra-realistic cinematic styles
-        styles = [
-            "shot on ARRI Alexa 65, anamorphic lens flare, dramatic slow motion, golden hour rim lighting",
-            "extreme close-up wildlife photography, Canon EOS R5, 800mm telephoto lens, creamy bokeh",
-            "David Attenborough BBC documentary style, aerial drone tracking shot, epic landscape",
-            "intimate National Geographic portrait, shallow depth of field, piercing eye contact",
-            "Planet Earth II cinematography, 8K RED camera, professional color grade, atmospheric fog"
+        try:
+            prompt = build_hyper_realistic_sora_prompt(
+                animal_name=animal['name'],
+                model_router=self.model_router,
+                duration=duration
+            )
+            logger.info(f"✅ Generated hyper-realistic Sora prompt for {animal['name']}")
+            return prompt
+        except Exception as e:
+            logger.error(f"Prompt generation failed: {e}, using fallback")
+            # Simple fallback if the new system fails
+            return f"""HYPER-REALISTIC WILDLIFE DOCUMENTARY: A {animal['name']} in its natural habitat. 
+            
+Shot on RED camera with BBC Earth documentary cinematography. The {animal['name']} is anatomically perfect with realistic texture and natural coloration. Crystal clear 8K resolution.
+            
+The animal moves naturally over {duration} seconds with scientifically accurate behavior. Environment is photorealistic with proper lighting and shadows. 
+            
+Documentary-grade footage suitable for National Geographic. NO glitches, NO morphing, NO impossible physics. Every frame is believable."""
+        """
+        Build production-grade Sora 2 prompt matching n8n workflow quality.
+        Follows the same structure: Scene Setup, Camera, Action, Physical Realism, Lighting, Audio, Tone.
+        """
+        
+        # Camera variations for natural diversity
+        camera_setups = [
+            {
+                "position": "low angle, 3 feet from subject",
+                "movement": "handheld with subtle breathing sway",
+                "lens": "50mm equivalent on smartphone",
+                "style": "intimate wildlife portrait"
+            },
+            {
+                "position": "eye level, 6 feet back",
+                "movement": "slow gentle pan following the subject",
+                "lens": "telephoto zoom, shallow depth of field",
+                "style": "BBC Earth documentary style"
+            },
+            {
+                "position": "slightly elevated, 4 feet distance",
+                "movement": "locked tripod with micro-shake from wind",
+                "lens": "wide angle capturing environment",
+                "style": "National Geographic establishing shot"
+            },
+            {
+                "position": "ground level, 2 feet from subject",
+                "movement": "static with natural camera breathing",
+                "lens": "macro close-up, creamy bokeh background",
+                "style": "Planet Earth intimate moment"
+            }
         ]
         
-        style = random.choice(styles)
+        # Lighting variations for time-of-day diversity
+        lighting_setups = [
+            "golden hour backlight with warm rim glow on fur, soft shadows stretching across terrain",
+            "overcast diffused light creating even illumination, subtle highlights on eyes and wet nose",
+            "early morning side light cutting through mist, dramatic contrast on textured fur",
+            "late afternoon warm sunlight filtering through trees, dappled light patterns on ground",
+            "midday bright natural light with crisp shadows, vibrant colors in full saturation"
+        ]
+        
+        # Environment details for grounded realism
+        environments = {
+            "snow": "pristine white snow with realistic compression under paws, distant mountain peaks sharp against blue sky, scattered rocks with snow accumulation",
+            "grass": "tall golden grass swaying gently in breeze, scattered wildflowers, distant tree line with atmospheric haze",
+            "water": "crystal clear water with visible ripples and reflections, smooth stones on riverbed, gentle current creating natural movement",
+            "forest": "dense foliage with filtered sunlight, moss-covered fallen logs, leaf litter on forest floor with natural texture",
+            "desert": "warm sand with wind-carved patterns, sparse vegetation, heat shimmer visible in distance",
+            "ice": "translucent blue ice with natural cracks and texture, frozen water droplets, reflective surface catching light"
+        }
+        
+        # Select variations
+        camera = random.choice(camera_setups)
+        lighting = random.choice(lighting_setups)
+        
+        # Determine environment from animal's prompt_style
         action = animal.get('prompt_style', 'in its natural habitat')
+        env_key = "grass"  # default
+        if "snow" in action.lower() or "ice" in action.lower():
+            env_key = "snow"
+        elif "water" in action.lower() or "swim" in action.lower():
+            env_key = "water"
+        elif "forest" in action.lower() or "tree" in action.lower():
+            env_key = "forest"
+        elif "desert" in action.lower() or "sand" in action.lower():
+            env_key = "desert"
         
-        return f"""HYPER-REALISTIC wildlife footage of a real {animal['name']} {action}.
+        environment = environments.get(env_key, environments["grass"])
+        
+        # Build the prompt as natural paragraphs (no headings, no lists)
+        prompt = f"""A {animal['name']} {action} filmed in one continuous unbroken shot. The camera is positioned at {camera['position']}, using a {camera['lens']}, capturing the scene with {camera['movement']}. This is {camera['style']}, filmed as if on a modern smartphone held by a wildlife photographer in the field.
 
-CINEMATOGRAPHY: {style}
-REALISM: Photorealistic, indistinguishable from real BBC/National Geographic footage. Real fur texture, authentic muscle movement, natural breathing, lifelike eyes with reflections.
-QUALITY: 8K resolution, RAW cinema quality, razor sharp focus on subject, professional wildlife documentary grade.
-LIGHTING: Cinematic natural lighting, volumetric rays, realistic shadows.
-MOVEMENT: Ultra-smooth slow motion, {duration} seconds of continuous fluid motion.
-ASPECT: 9:16 vertical (TikTok/Reels/Shorts optimized).
+The {animal['name']} is anatomically perfect with correct proportions, realistic fur texture showing individual hairs catching light, natural muscle definition visible beneath the coat, and lifelike eyes with clear reflections of the environment. Every movement obeys real-world physics: weight shifts naturally, paws compress snow/grass/ground with appropriate pressure, tail movement follows natural momentum and balance, breathing is visible in chest expansion, and ears rotate naturally tracking sounds.
 
-This must look 100% real - not CGI, not animated, not stylized. Pure photorealistic wildlife footage that could air on BBC Earth."""
+The action unfolds naturally over {duration} seconds. The {animal['name']} {action}, with each micro-movement showing authentic animal behavior - head tilts, ear flicks, weight distribution, balance adjustments. If moving, the gait is biomechanically accurate with proper leg coordination and natural rhythm. Fur moves realistically with motion and wind, showing proper weight and flow.
+
+The environment is {environment}. Everything remains physically grounded and safe - no impossible movements, no morphing, no teleporting, no sudden changes in size or appearance. The {animal['name']} stays clearly visible and in focus throughout, with consistent lighting and shadows from the main light source.
+
+Lighting is {lighting}. Shadows are consistent with the light direction, creating natural depth and dimension. The {animal['name']}'s fur shows realistic light interaction with subsurface scattering on ears and translucent areas, specular highlights on wet nose and eyes, and proper shadow casting on the ground.
+
+Natural ambient audio fills the scene: gentle wind rustling through vegetation, distant bird calls appropriate to the habitat, the {animal['name']}'s breathing and natural vocalizations (realistic animal sounds, not human-like), subtle environmental sounds like water trickling or leaves crunching underfoot. No music, no narration, no voiceover.
+
+The tone is captivating and authentic, showcasing the {animal['name']}'s natural beauty and behavior in a moment that feels spontaneous yet perfectly framed. This is hyper-realistic wildlife footage indistinguishable from actual BBC Earth or National Geographic content - pure photorealism with zero CGI, animation, or stylization. Shot in 9:16 vertical format optimized for mobile viewing, maintaining razor-sharp focus on the subject with cinematic depth of field."""
+
+        return prompt
     
-    def _kie_generate(self, key, prompt, duration=10):
-        """Generate video via Kie.ai with configurable duration"""
-        headers = {"Authorization": f"Bearer {key}"}
+    def _kie_generate(self, key, prompt, duration=10, max_retries=3):
+        """Generate video via Kie.ai with retry logic and error handling"""
+        headers = {
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json"
+        }
         
-        # Kie.ai supports different durations
-        resp = requests.post(
-            "https://api.kie.ai/api/v1/jobs/createTask",
-            headers=headers,
-            json={
-                "model": "sora-2-text-to-video",
+        n_frames = "10" if duration <= 10 else "15"
+        
+        payload = {
+            "model": "sora-2-text-to-video",
+            "input": {
                 "prompt": prompt,
-                "aspect_ratio": "9:16",
-                "duration": duration  # 5, 10, 15, or 20 seconds
-            },
-            timeout=60
-        )
-        data = resp.json()
-        task_id = data.get('data', {}).get('taskId')
-        if not task_id:
-            raise Exception(f"No task ID returned: {data}")
-        return task_id
+                "aspect_ratio": "portrait",
+                "n_frames": n_frames
+            }
+        }
+        
+        logger.info(f"🎥 Kie.ai request: model={payload['model']}, frames={n_frames}")
+        print(f"🎥 Kie.ai request: model={payload['model']}, frames={n_frames}")
+        
+        for attempt in range(max_retries):
+            try:
+                resp = requests.post(
+                    "https://api.kie.ai/api/v1/jobs/createTask",
+                    headers=headers,
+                    json=payload,
+                    timeout=60
+                )
+                
+                logger.info(f"🎥 Kie.ai response: status={resp.status_code}")
+                
+                if resp.status_code == 200:
+                    data = resp.json()
+                    
+                    if data.get('code') in [0, 200]:
+                        task_id = data.get('data', {}).get('taskId') or data.get('taskId')
+                        if task_id:
+                            logger.info(f"🎥 Success! Task created: {task_id}")
+                            print(f"🎥 Success! Task created: {task_id}")
+                            return task_id
+                    
+                    error_msg = f"Kie.ai logic error: {data.get('msg')} (Code: {data.get('code')})"
+                    logger.error(error_msg)
+                    raise Exception(error_msg)
+                else:
+                    error_msg = f"Kie.ai HTTP error {resp.status_code}: {resp.text}"
+                    logger.error(error_msg)
+                    raise Exception(error_msg)
+                    
+            except requests.exceptions.Timeout:
+                logger.warning(f"Kie.ai timeout on attempt {attempt + 1}/{max_retries}")
+                if attempt < max_retries - 1:
+                    time.sleep(2 ** attempt)  # Exponential backoff
+                    continue
+                raise Exception("Kie.ai request timed out after retries")
+            except requests.exceptions.RequestException as e:
+                logger.error(f"Kie.ai request failed: {str(e)}")
+                if attempt < max_retries - 1:
+                    time.sleep(2 ** attempt)
+                    continue
+                raise
+        
+        raise Exception("Kie.ai generation failed after all retries")
     
-    def _kie_poll(self, key, task_id, max_wait=120):
-        """Poll for video completion"""
+    def _kie_poll(self, key, task_id, max_wait=300):
+        """Poll for video completion - extended for Sora 2 (2-5 minutes)"""
         headers = {"Authorization": f"Bearer {key}"}
-        polls = max_wait // 5
         
-        for _ in range(polls):
-            resp = requests.get(
-                f"https://api.kie.ai/api/v1/jobs/{task_id}",
-                headers=headers,
-                timeout=30
-            )
-            data = resp.json().get('data', {})
-            status = data.get('status')
-            
-            if status == 'completed':
-                return data.get('result_url')
-            elif status == 'failed':
-                raise Exception(f"Generation failed: {data.get('error')}")
-            
-            time.sleep(5)
+        # Extended polling: 60 attempts x 5s = 300s (5 minutes)
+        max_polls = 60
+        poll_interval = 5
         
-        raise Exception("Timed out waiting for video generation")
+        for i in range(max_polls):
+            time.sleep(poll_interval)
+            
+            try:
+                resp = requests.get(
+                    f"https://api.kie.ai/api/v1/jobs/recordInfo?taskId={task_id}",
+                    headers=headers,
+                    timeout=30
+                )
+                
+                print(f"🎥 Poll {i+1}/{max_polls} response: {resp.status_code}")
+                
+                if resp.status_code != 200:
+                    print(f"🎥 Poll error: HTTP {resp.status_code}")
+                    continue
+                
+                response_json = resp.json()
+                
+                # Handle different response structures
+                if isinstance(response_json, dict):
+                    # Try to get data from different possible locations
+                    data = response_json.get('data', response_json)
+                    
+                    # Get status/state from multiple possible fields
+                    status = (data.get('status') or 
+                             data.get('state') or 
+                             data.get('taskStatus') or 
+                             response_json.get('status') or 
+                             response_json.get('state') or '').lower()
+                    
+                    # Get progress percentage
+                    progress = data.get('progress', 0)
+                    
+                    print(f"🎥 Status: {status} | Progress: {progress}%")
+                    
+                    # Kie.ai specific: Check if progress=100 AND resultJson exists
+                    # (state stays 'waiting' even when done)
+                    # Note: resultJson may be empty for a few polls after progress=100
+                    result_json = data.get('resultJson', '')
+                    if result_json:  # If resultJson exists (regardless of progress)
+                        # Parse resultJson to get video URL
+                        try:
+                            import json
+                            result_data = json.loads(result_json) if isinstance(result_json, str) else result_json
+                            video_url = (result_data.get('videoUrl') or 
+                                       result_data.get('video_url') or 
+                                       result_data.get('url'))
+                            if video_url:
+                                logger.info(f"✅ Video ready (via resultJson): {video_url}")
+                                return video_url
+                        except Exception as e:
+                            logger.warning(f"Failed to parse resultJson: {e}")
+                    
+                    # Check if completed via status
+                    if status in ['completed', 'success', 'done', 'finished', 'succeed']:
+                        # Try multiple possible video URL fields
+                        video_url = (data.get('videoUrl') or 
+                                   data.get('video_url') or 
+                                   data.get('url') or
+                                   data.get('resultUrl') or
+                                   data.get('result_url') or
+                                   response_json.get('videoUrl') or
+                                   response_json.get('video_url'))
+                        
+                        if video_url:
+                            logger.info(f"✅ Video ready: {video_url}")
+                            return video_url
+                        else:
+                            logger.warning(f"Video marked complete but no URL found. Response: {response_json}")
+                            
+                    elif status in ['failed', 'error', 'failure']:
+                        error_msg = data.get('error') or data.get('message') or 'Unknown error'
+                        logger.error(f"Kie.ai generation failed: {error_msg}")
+                        raise Exception(f"Kie.ai generation failed: {error_msg}")
+                    
+                    elif status in ['pending', 'processing', 'running', 'queued', 'in_progress', 'waiting']:
+                        # Still processing, continue loop
+                        pass
+                    else:
+                        # Unknown status, log and continue
+                        print(f"⚠️ Unknown status: '{status}' - continuing to poll...")
+                        
+            except requests.exceptions.RequestException as e:
+                logger.warning(f"Poll {i+1} request failed: {str(e)}")
+                continue
+        
+        raise Exception(f"Video generation timed out after {max_wait}s")
     
     def _compose_video(self, video_url, fact_text, animal_name):
         """

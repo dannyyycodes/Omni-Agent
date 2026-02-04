@@ -1,0 +1,10 @@
+"""
+Flask route to serve the video overlay preview page
+"""
+
+# Add this to app.py
+
+@app.route('/preview/video-overlay')
+def preview_video_overlay():
+    """Show preview of how videos with text overlays look"""
+    return render_template('video_overlay_preview.html')

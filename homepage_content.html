@@ -1,0 +1,182 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OMNI - Command Center</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+
+<body>
+    <div class="layout">
+        <!-- Mobile Menu Toggle -->
+        <button class="mobile-menu-toggle" onclick="toggleSidebar()">
+            <i data-lucide="menu"></i>
+        </button>
+        <div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+
+        <aside class="sidebar glass-panel">
+            <div class="logo">
+                <i data-lucide="zap"></i> OMNI
+            </div>
+            <nav>
+                <a href="/" class="nav-item active">
+                    <i data-lucide="layout-dashboard"></i> Dashboard
+                </a>
+                <a href="/chat" class="nav-item ">
+                    <i data-lucide="message-square"></i> Chat Agent
+                </a>
+                <div style="margin: 20px 0; border-bottom: 1px solid var(--glass-border);"></div>
+                <a href="/projects" class="nav-item">
+                    <i data-lucide="folder"></i> Projects
+                </a>
+                <a href="/pipeline" class="nav-item ">
+                    <i data-lucide="kanban"></i> Pipeline (Live)
+                </a>
+                <a href="#" class="nav-item">
+                    <i data-lucide="activity"></i> Social Tracker
+                </a>
+                <a href="#" class="nav-item">
+                    <i data-lucide="settings"></i> Settings
+                </a>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            
+<div class="header">
+    <h1>Welcome back, Creator</h1>
+    <p>System Online. 0 workflows ready.</p>
+</div>
+
+<!-- Stats Row -->
+<div class="stats-grid">
+    <div class="stat-card glass-panel">
+        <div class="stat-label"><i data-lucide="cpu"></i> Active Workflows</div>
+        <div class="stat-value">0</div>
+        <div class="text-gradient">Operational</div>
+    </div>
+
+    <div class="stat-card glass-panel">
+        <div class="stat-label"><i data-lucide="youtube"></i> YouTube Subs</div>
+        <div class="stat-value" id="yt-subs">0</div>
+        <div style="color: var(--success); display: flex; align-items: center; gap: 4px;">
+            <i data-lucide="trending-up" size="16"></i> +0
+        </div>
+    </div>
+
+    <div class="stat-card glass-panel">
+        <div class="stat-label"><i data-lucide="instagram"></i> Instagram</div>
+        <div class="stat-value" id="ig-subs">0</div>
+        <div style="color: var(--success); display: flex; align-items: center; gap: 4px;">
+            <i data-lucide="trending-up" size="16"></i> +0
+        </div>
+    </div>
+</div>
+
+<!-- Recent Activity / Controls -->
+<div class="glass-panel" style="padding: 30px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h3><i data-lucide="zap"></i> Quick Actions</h3>
+        <button class="btn btn-primary" onclick="window.location.href='/chat?msg=Create new workflow'">New
+            Workflow</button>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+        <!-- Sora Card -->
+        <div
+            style="background: rgba(255,255,255,0.05); padding: 20px; border-radius: 12px; border: 1px solid var(--glass-border);">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                <strong>Sora Automation</strong>
+                <span
+                    style="color: var(--success); font-size: 0.8rem; background: rgba(0,255,135,0.1); padding: 2px 8px; border-radius: 10px;">READY</span>
+            </div>
+            <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 15px;">
+                "Animals & Babies" workflow loaded.
+            </p>
+            <div style="display: flex; gap: 10px;">
+                <button class="btn" onclick="window.location.href='/chat?msg=Run Sora Workflow'"
+                    style="background: rgba(255,255,255,0.1); flex: 1; font-size: 0.8rem;">
+                    Run Now
+                </button>
+                <button class="btn" style="background: rgba(255,255,255,0.05); font-size: 0.8rem;">
+                    Edit
+                </button>
+            </div>
+        </div>
+
+        <!-- Tracker Card -->
+        <div
+            style="background: rgba(255,255,255,0.05); padding: 20px; border-radius: 12px; border: 1px solid var(--glass-border);">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                <strong>Social Tracker</strong>
+                <span style="color: var(--text-secondary); font-size: 0.8rem;" id="last-updated">Last: Never</span>
+            </div>
+            <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 15px;">
+                Tracking connected accounts via Blotato.
+            </p>
+            <button class="btn" id="refresh-btn" onclick="refreshStats()"
+                style="background: rgba(255,255,255,0.1); width: 100%; font-size: 0.9rem;">
+                <i data-lucide="refresh-cw" size="14"></i> Refresh Stats
+            </button>
+        </div>
+    </div>
+</div>
+
+        </main>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        function toggleSidebar() {
+            document.querySelector('.sidebar').classList.toggle('open');
+            document.querySelector('.sidebar-overlay').classList.toggle('active');
+        }
+
+        // Close sidebar when clicking a nav item on mobile
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', () => {
+                if (window.innerWidth <= 768) {
+                    toggleSidebar();
+                }
+            });
+        });
+    </script>
+    
+<script>
+    async function refreshStats() {
+        const btn = document.getElementById('refresh-btn');
+        btn.innerHTML = 'Refreshing...';
+        btn.disabled = true;
+
+        try {
+            const response = await fetch('/api/refresh-stats', { method: 'POST' });
+            const data = await response.json();
+
+            // Update DOM
+            document.getElementById('yt-subs').innerText = data.youtube.subs;
+            document.getElementById('ig-subs').innerText = data.instagram.subs;
+            document.getElementById('last-updated').innerText = 'Last: ' + data.last_updated;
+
+            btn.innerHTML = '<i data-lucide="check"></i> Updated';
+            setTimeout(() => {
+                btn.innerHTML = '<i data-lucide="refresh-cw"></i> Refresh Stats';
+                btn.disabled = false;
+                lucide.createIcons();
+            }, 2000);
+
+        } catch (e) {
+            console.error(e);
+            btn.innerHTML = 'Error';
+        }
+    }
+</script>
+
+</body>
+
+</html>

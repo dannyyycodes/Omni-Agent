@@ -28,6 +28,31 @@ from web_agent.browser import WebAgent
 from storage.files import FileManager
 from core.scheduler import init_scheduler, get_scheduler
 
+# Import API blueprints
+try:
+    from api.import_videos import bp as import_videos_bp
+    HAS_IMPORT_VIDEOS = True
+except:
+    HAS_IMPORT_VIDEOS = False
+
+try:
+    from api.simple_video import bp as simple_video_bp
+    HAS_SIMPLE_VIDEO = True
+except:
+    HAS_SIMPLE_VIDEO = False
+
+try:
+    from api.process_video import bp as process_video_bp
+    HAS_PROCESS_VIDEO = True
+except:
+    HAS_PROCESS_VIDEO = False
+
+try:
+    from api.diagnostic import bp as diagnostic_bp
+    HAS_DIAGNOSTIC = True
+except:
+    HAS_DIAGNOSTIC = False
+
 # ============================================================
 # FLASK APP SETUP
 # ============================================================
@@ -38,6 +63,17 @@ app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB max upload
 app.config['UPLOAD_FOLDER'] = '/tmp/omni_uploads'
 
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+# ============================================================
+# INITIALIZE DATABASE TABLES
+# ============================================================
+
+# Initialize database tables before anything else
+try:
+    from init_db import init_database
+    init_database()
+except Exception as e:
+    print(f"⚠️  Database initialization warning: {e}")
 
 # ============================================================
 # INITIALIZE OMNI COMPONENTS
@@ -96,6 +132,16 @@ def init_omni():
     global workflow_scheduler
     workflow_scheduler = init_scheduler(api_hub, model_router)
     
+    # ✅ ACTIVATE ANIMAL FACTS - Runs every 6 hours (4 posts/day)
+    workflow_scheduler.schedule_animal_facts(interval_hours=6, enabled=True)
+    print("✅ Animal Facts workflow scheduled: Every 6 hours")
+    
+    # ✅ ACTIVATE DAILY EMAIL SUMMARY - One email per day at 9 AM UTC
+    from core.daily_emailer import init_daily_emailer
+    init_daily_emailer()
+    print("✅ Daily summary email scheduled: 9 AM UTC")
+
+    
     print("✅ OMNI initialized successfully")
 
 
@@ -111,6 +157,12 @@ def before_request():
 
 @app.route('/')
 def index():
+    """Redirect to video viewer"""
+    return redirect('/videos')
+
+
+@app.route('/dashboard')
+def dashboard():
     """Main dashboard"""
     # 1. Get Social Stats
     social_stats = None
@@ -137,8 +189,20 @@ def index():
                          active_workflows=active_count)
 
 
-@app.route('/api/refresh-stats', methods=['POST'])
-def refresh_stats():
+@app.route('/videos')
+def video_viewer():
+    """Video viewer page with task status"""
+    return render_template('video_viewer.html')
+
+
+@app.route('/preview/video-overlay')
+def preview_video_overlay():
+    """Show preview of how videos with text overlays look"""
+    return render_template('video_overlay_preview.html')
+
+
+@app.route('/api/tasks/<task_id>', methods=['GET'])
+def refresh_stats(task_id): # task_id parameter added as per new route
     """Force refresh social stats"""
     if 'social_tracker' not in globals():
         from core.social_tracker import SocialTracker
@@ -156,6 +220,12 @@ def chat(project_id=None):
     return render_template('chat.html', page='chat', project_id=project_id)
 
 
+@app.route('/simple')
+def simple_chat():
+    """Simple conversational interface - no code complexity"""
+    return render_template('simple_chat.html')
+
+
 @app.route('/settings')
 def settings_page():
     """Settings page"""
@@ -168,28 +238,21 @@ def settings_page():
     }
     return render_template('settings.html', page='settings', config=config)
 
+
 @app.route('/pipeline')
 def pipeline_page():
     """Pipeline Command Center"""
-    # In Phase 1, we simulate the data structure that the Universal Brain will eventually populate.
-    # Phase 2 will wire this to a real database table 'pipeline_items'
+    # Real data will be populated by workflows when they run
+    # No more mock/placeholder data
     
     pipeline_data = {
-        'ideas': [
-            {'source': 'Reddit', 'title': 'AI generated Python tutorial', 'date': '2m ago'},
-            {'source': 'Twitter', 'title': 'React vs Vue 2026', 'date': '1h ago'}
-        ],
-        'in_progress': [
-            {'type': 'Sora Video', 'title': 'Baby Goat Hops', 'status': 'Generating Video (Kie.ai)...', 'progress': 65}
-        ],
-        'review': [
-            {'type': 'Tweet', 'title': 'Gemini 1.5 Update News', 'source': 'TechCrunch'}
-        ],
-        'published': [
-            {'type': 'Video', 'title': 'Daily AI News Recap', 'views': 1240}
-        ]
+        'ideas': [],
+        'in_progress': [],
+        'review': [],
+        'published': []
     }
     return render_template('pipeline.html', page='pipeline', pipeline=pipeline_data)
+
 
 @app.route('/api/settings', methods=['POST'])
 def save_settings():
@@ -587,8 +650,12 @@ def api_animal_facts_run():
                 'message': 'Please add your Kie.ai API key in Settings'
             }), 400
         
+        # Use async wrapper for reliable execution
+        from core.async_workflow_wrapper import AsyncWorkflowWrapper
+        
         workflow = AnimalFactsWorkflow(api_hub, model_router)
-        result = workflow.run(animal_id, dry_run=dry_run, duration=duration)
+        async_wrapper = AsyncWorkflowWrapper(workflow)
+        result = async_wrapper.run_async(animal_id=animal_id, duration=duration)
         
         return jsonify(result)
         
@@ -721,6 +788,86 @@ def api_scheduler_logs():
         return jsonify({'logs': logs})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/tasks/<task_id>', methods=['GET'])
+def api_get_task_status(task_id):
+    """Get status of a pending video task"""
+    try:
+        from core.memory import MemoryManager, PendingVideoTask, HAS_SQLALCHEMY
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        
+        if not HAS_SQLALCHEMY:
+            return jsonify({'error': 'Database not available'}), 500
+        
+        db_url = get_db_url()
+        engine = create_engine(db_url)
+        Session = sessionmaker(bind=engine)
+        session = Session()
+        
+        task = session.query(PendingVideoTask).filter_by(task_id=task_id).first()
+        
+        if not task:
+            return jsonify({'error': 'Task not found'}), 404
+        
+        result = {
+            'task_id': task.task_id,
+            'status': task.status,
+            'animal': task.animal_name,
+            'fact': task.fact_text,
+            'video': task.video_url,
+            'created_at': task.created_at.isoformat() if task.created_at else None,
+            'completed_at': task.completed_at.isoformat() if task.completed_at else None,
+            'error': task.error_message
+        }
+        
+        session.close()
+        return jsonify(result)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/tasks', methods=['GET'])
+def api_list_tasks():
+    """List all video tasks"""
+    try:
+        from core.memory import MemoryManager, PendingVideoTask, HAS_SQLALCHEMY
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        
+        if not HAS_SQLALCHEMY:
+            return jsonify({'error': 'Database not available', 'tasks': []}), 200
+        
+        db_url = get_db_url()
+        engine = create_engine(db_url)
+        Session = sessionmaker(bind=engine)
+        session = Session()
+        
+        # Get all tasks, most recent first
+        tasks = session.query(PendingVideoTask).order_by(
+            PendingVideoTask.created_at.desc()
+        ).limit(50).all()
+        
+        result = []
+        for task in tasks:
+            result.append({
+                'task_id': task.task_id,
+                'status': task.status,
+                'animal': task.animal_name,
+                'fact': task.fact_text[:100] + '...' if task.fact_text and len(task.fact_text) > 100 else task.fact_text,
+                'video_url': task.video_url,
+                'created_at': task.created_at.isoformat() if task.created_at else None,
+                'completed_at': task.completed_at.isoformat() if task.completed_at else None,
+                'error': task.error_message
+            })
+        
+        session.close()
+        return jsonify({'tasks': result, 'count': len(result)})
+        
+    except Exception as e:
+        return jsonify({'error': str(e), 'tasks': []}), 200
 
 
 @app.route('/health')
@@ -2396,6 +2543,23 @@ MEMORY_HTML = r'''
 # ============================================================
 # RUN
 # ============================================================
+
+# Register API blueprints
+if HAS_IMPORT_VIDEOS:
+    app.register_blueprint(import_videos_bp)
+    print("✅ Import videos API registered")
+
+if HAS_SIMPLE_VIDEO:
+    app.register_blueprint(simple_video_bp)
+    print("✅ Simple video preview registered")
+
+if HAS_PROCESS_VIDEO:
+    app.register_blueprint(process_video_bp)
+    print("✅ Video processing API registered")
+
+if HAS_DIAGNOSTIC:
+    app.register_blueprint(diagnostic_bp)
+    print("✅ Diagnostic API registered")
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
