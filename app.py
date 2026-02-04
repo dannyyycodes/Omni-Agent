@@ -57,6 +57,8 @@ except:
 # FLASK APP SETUP
 # ============================================================
 
+print("🚀 DEPLOYMENT TRIGGER: VIDEO GALLERY V5") # Force Rebuild
+
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', os.urandom(24).hex())
 app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB max upload
