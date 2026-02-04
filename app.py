@@ -1027,6 +1027,66 @@ def api_admin_list_videos():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/admin/status', methods=['GET'])
+def api_admin_status():
+    """Get overall system status including last run time"""
+    try:
+        # Get video count and last run time
+        video_dir = os.path.join(app.root_path, 'static', 'videos')
+        os.makedirs(video_dir, exist_ok=True)
+
+        videos = []
+        for f in os.listdir(video_dir):
+            if f.endswith('.mp4'):
+                filepath = os.path.join(video_dir, f)
+                stat = os.stat(filepath)
+                videos.append({
+                    'filename': f,
+                    'created_at': datetime.fromtimestamp(stat.st_mtime)
+                })
+
+        videos.sort(key=lambda x: x['created_at'], reverse=True)
+
+        last_run = None
+        last_video = None
+        if videos:
+            last_run = videos[0]['created_at'].isoformat()
+            last_video = videos[0]['filename']
+
+        # Get animal count
+        animals_path = os.path.join(os.path.dirname(__file__), 'data', 'animals.json')
+        animal_count = 0
+        if os.path.exists(animals_path):
+            with open(animals_path, 'r') as f:
+                data = json.load(f)
+                animal_count = len(data.get('animals', []))
+
+        # Get scheduler status
+        scheduler_status = {'enabled': False, 'interval_hours': 6}
+        try:
+            schedules = workflow_scheduler.get_schedules()
+            for s in schedules:
+                if s.get('workflow') == 'animal_facts':
+                    scheduler_status = {
+                        'enabled': s.get('enabled', False),
+                        'interval_hours': s.get('interval_hours', 6)
+                    }
+                    break
+        except:
+            pass
+
+        return jsonify({
+            'video_count': len(videos),
+            'animal_count': animal_count,
+            'last_run': last_run,
+            'last_video': last_video,
+            'scheduler': scheduler_status
+        })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/health')
 def health():
     """Health check"""

@@ -17,7 +17,7 @@ def get_db_session():
     if not HAS_SQLALCHEMY:
         return None
     
-    database_url = os.environ.get('DATABASE_URL', 'sqlite:///omni_memory.db')
+    database_url = os.environ.get('DATABASE_URL', 'sqlite:///omni.db')
     if database_url.startswith('postgres://'):
         database_url = database_url.replace('postgres://', 'postgresql://', 1)
     

@@ -18,7 +18,7 @@ class VideoTaskProcessor:
     """Process pending video generation tasks in the background"""
     
     def __init__(self):
-        self.database_url = os.environ.get('DATABASE_URL', 'sqlite:///omni_memory.db')
+        self.database_url = os.environ.get('DATABASE_URL', 'sqlite:///omni.db')
         if self.database_url.startswith('postgres://'):
             self.database_url = self.database_url.replace('postgres://', 'postgresql://', 1)
         

@@ -63,7 +63,7 @@ class MemoryManager:
     """
     
     def __init__(self, database_url=None):
-        self.database_url = database_url or os.environ.get('DATABASE_URL', 'sqlite:///omni_memory.db')
+        self.database_url = database_url or os.environ.get('DATABASE_URL', 'sqlite:///omni.db')
         
         if self.database_url.startswith('postgres://'):
             self.database_url = self.database_url.replace('postgres://', 'postgresql://', 1)
