@@ -1,301 +1,192 @@
-"""
-Video Composer Utility
-Handles FFmpeg-based video composition for adding text overlays.
-"""
 
 import os
-import subprocess
-import tempfile
 import requests
-from PIL import Image, ImageDraw, ImageFont
-
+from PIL import Image, ImageDraw, ImageFont, ImageFilter
+from moviepy.editor import VideoFileClip, ImageClip, CompositeVideoClip, concatenate_videoclips
+import textwrap
 
 class VideoComposer:
-    def __init__(self):
-        self.output_dir = os.environ.get('VIDEO_OUTPUT_DIR', '/tmp/omni_videos')
+    def __init__(self, output_dir=None):
+        self.output_dir = output_dir or os.environ.get('VIDEO_OUTPUT_DIR', '/tmp/omni_videos')
         os.makedirs(self.output_dir, exist_ok=True)
         
-    def add_fact_overlay(self, video_url, fact_text, title="", output_name=None):
-        """
-        Add a white text bar overlay to the top of a video.
-        
-        Layout:
-        ┌─────────────────────┐
-        │   WHITE BAR         │  <- 200px height
-        │   "Did you know..." │
-        ├─────────────────────┤
-        │                     │
-        │   VIDEO CONTENT     │  <- Cropped/scaled
-        │                     │
-        └─────────────────────┘
-        """
-        
-        output_name = output_name or f"animal_fact_{title.lower().replace(' ', '_')}.mp4"
-        output_path = os.path.join(self.output_dir, output_name)
-        
-        # 1. Download the source video
+    def add_fact_overlay(self, video_url, fact_text, animal_name, output_filename="final_video.mp4"):
+        # 1. Download/Get Video
         video_path = self._download_video(video_url)
         
-        # 2. Create the text bar image
-        text_bar_path = self._create_text_bar(fact_text, title)
-        
-        # 3. Use FFmpeg to compose
+        # 2. Extract first 5s (or loop it) - simplified logic
         try:
-            self._compose_with_ffmpeg(video_path, text_bar_path, output_path)
+             video_clip = VideoFileClip(video_path)
+             # Assume video is fine, maybe truncate if too long?
+             # For now, just use it.
         except Exception as e:
-            print(f"FFmpeg composition failed: {e}")
-            # If FFmpeg fails, return the original video URL
-            return video_url
+            print(f"Error loading video: {e}")
+            return video_path
+
+        # 3. Create Text Overlay Image
+        # Define dimensions (1080x1920 usually)
+        w, h = video_clip.size
         
-        # 4. Upload composed video (or return local path)
-        # For now, return local path. In production, upload to S3/Cloudinary
-        if os.path.exists(output_path):
-            return output_path
-        else:
-            return video_url
-    
+        # Create Header Bar (Top 400px)
+        bar_path = self._create_text_bar(fact_text, f"{animal_name} Facts", w, 400)
+        
+        # 4. Composite
+        # Using moviepy
+        # Overlay the bar image at top=(0,0)
+        bar_clip = ImageClip(bar_path).set_duration(video_clip.duration).set_pos(('center', 'top')) # or (0,0)
+        
+        final = CompositeVideoClip([video_clip, bar_clip], size=video_clip.size)
+        
+        out_path = os.path.join(self.output_dir, output_filename)
+        final.write_videofile(out_path, codec='libx264', audio_codec='aac', fps=30, verbose=False, logger=None)
+        
+        return out_path
+
     def _download_video(self, url):
-        """Download video from URL to temp file"""
+        """Download video from URL to temp file, or use local file"""
+        # Check if local file
+        if os.path.exists(url):
+            return url
+            
         temp_path = os.path.join(self.output_dir, 'temp_source.mp4')
+        try:
+            response = requests.get(url, stream=True, timeout=120)
+            if response.status_code == 200:
+                with open(temp_path, 'wb') as f:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        f.write(chunk)
+                return temp_path
+        except Exception as e:
+            print(f"Download error: {e}")
+            
+        return url # Fallback to returning original string if fail
         
-        response = requests.get(url, stream=True, timeout=120)
-        with open(temp_path, 'wb') as f:
-            for chunk in response.iter_content(chunk_size=8192):
-                f.write(chunk)
+    def _create_text_bar(self, fact_text, title, width=1080, height=400):
+        # Check for template
+        template_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'assets', 'header_template.png')
         
-        return temp_path
-    
-    def _create_text_bar(self, fact_text, title, width=1080, height=300):
-        """
-        Create a professional branded text bar with emojis and @howanimalslove
-        Returns path to the PNG file.
-        """
-        # Create white background with more height for better readability
-        img = Image.new('RGB', (width, height), color='white')
+        if os.path.exists(template_path):
+            try:
+                img = Image.open(template_path).convert('RGB')
+                if img.size != (width, height):
+                    img = img.resize((width, height), Image.Resampling.LANCZOS)
+            except:
+                 img = Image.new('RGB', (width, height), color='white')
+        else:
+             img = Image.new('RGB', (width, height), color='white')
+            
         draw = ImageDraw.Draw(img)
         
-        # Try to load nice fonts with BIGGER sizes
+        # 1. Setup Fonts
+        # Try to find Segoe UI Emoji for windows, or fallback
+        # Also need a Bold font for text
+        
+        emoji_path = 'C:/Windows/Fonts/seguiemj.ttf' 
+        bold_path = 'C:/Windows/Fonts/arialbd.ttf'
+        
+        if not os.path.exists(emoji_path):
+             if os.path.exists('C:/Windows/Fonts/seguisym.ttf'):
+                 emoji_path = 'C:/Windows/Fonts/seguisym.ttf'
+             else:
+                 emoji_path = "arial.ttf" 
+        
+        if not os.path.exists(bold_path):
+            bold_path = "arial.ttf"
+            
+        # REMOVED TITLE per V4 spec
+        
+        # 3. Draw Branding (Fixed Bottom Area)
+        brand_y = height - 70 # approx
         try:
-            font_paths = [
-                '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
-                '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf',
-                '/usr/share/fonts/TTF/DejaVuSans-Bold.ttf',
-            ]
-            title_font = None
-            fact_font = None
-            brand_font = None
-            
-            for path in font_paths:
-                if os.path.exists(path):
-                    title_font = ImageFont.truetype(path, 56)  # Much bigger!
-                    fact_font = ImageFont.truetype(path, 38)   # Bigger fact text
-                    brand_font = ImageFont.truetype(path, 32)  # Brand text
-                    break
-            
-            if not title_font:
-                title_font = ImageFont.load_default()
-                fact_font = ImageFont.load_default()
-                brand_font = ImageFont.load_default()
+            brand_font = ImageFont.truetype(emoji_path, 40)
         except:
-            title_font = ImageFont.load_default()
-            fact_font = ImageFont.load_default()
-            brand_font = ImageFont.load_default()
+             brand_font = ImageFont.load_default()
+             
+        brand_text = "@howanimalslove"
         
-        # Add emoji to title (animal-specific)
-        animal_emojis = {
-            'octopus': '🐙',
-            'mantis shrimp': '🦐',
-            'peacock': '🦚',
-            'lion': '🦁',
-            'elephant': '🐘',
-            'dolphin': '🐬',
-            'shark': '🦈',
-            'whale': '🐋',
-            'penguin': '🐧',
-            'eagle': '🦅',
-        }
+        bbox = draw.textbbox((0, 0), brand_text, font=brand_font)
+        bw = bbox[2] - bbox[0]
+        bx = (width - bw) // 2
+        draw.text((bx, brand_y), brand_text, fill='#555555', font=brand_font)
         
-        emoji = animal_emojis.get(title.lower(), '🐾')
-        title_with_emoji = f"{emoji} {title.upper()} {emoji}"
+        # 4. Draw Variable Fact (Middle Area)
+        # We need to fit text dynamically
+        # Available height approx: 40px (top padding) to brand_y (330) -> ~280px potentially
+        available_h = 280
+        start_y = 40
         
-        # Draw title (centered, top)
-        title_bbox = draw.textbbox((0, 0), title_with_emoji, font=title_font)
-        title_width = title_bbox[2] - title_bbox[0]
-        title_x = (width - title_width) // 2
-        draw.text((title_x, 20), title_with_emoji, fill='black', font=title_font)
+        fact_font, wrapped_lines = self._fit_text(draw, fact_text, bold_path, width - 120, available_h)
         
-        # Wrap fact text to fit width
-        wrapped_text = self._wrap_text(fact_text, fact_font, width - 80)
+        current_y = start_y
+        for line in wrapped_lines:
+             bbox = draw.textbbox((0, 0), line, font=fact_font)
+             lw = bbox[2] - bbox[0]
+             lh = bbox[3] - bbox[1]
+             
+             lx = (width - lw) // 2
+             draw.text((lx, current_y), line, fill='#222222', font=fact_font)
+             current_y += lh + 15
         
-        # Draw fact text (centered, below title)
-        text_y = 95
-        for line in wrapped_text:
-            bbox = draw.textbbox((0, 0), line, font=fact_font)
-            line_width = bbox[2] - bbox[0]
-            text_x = (width - line_width) // 2
-            draw.text((text_x, text_y), line, fill='#333333', font=fact_font)
-            text_y += bbox[3] - bbox[1] + 12
-        
-        # Add branding at bottom of text bar
-        brand_text = "📱 @howanimalslove"
-        brand_bbox = draw.textbbox((0, 0), brand_text, font=brand_font)
-        brand_width = brand_bbox[2] - brand_bbox[0]
-        brand_x = (width - brand_width) // 2
-        draw.text((brand_x, height - 55), brand_text, fill='#667eea', font=brand_font)
-        
-        # Save
         bar_path = os.path.join(self.output_dir, 'text_bar.png')
         img.save(bar_path)
         
         return bar_path
-    
-    def _wrap_text(self, text, font, max_width):
-        """Wrap text to fit within max_width"""
-        words = text.split()
-        lines = []
-        current_line = []
-        
-        # Create a temporary image for text measurement
-        temp_img = Image.new('RGB', (1, 1))
-        draw = ImageDraw.Draw(temp_img)
-        
-        for word in words:
-            current_line.append(word)
-            line_text = ' '.join(current_line)
-            bbox = draw.textbbox((0, 0), line_text, font=font)
-            line_width = bbox[2] - bbox[0]
-            
-            if line_width > max_width and len(current_line) > 1:
-                current_line.pop()
-                lines.append(' '.join(current_line))
-                current_line = [word]
-        
-        if current_line:
-            lines.append(' '.join(current_line))
-        
-        return lines
-    
-    def _compose_with_ffmpeg(self, video_path, text_bar_path, output_path):
-        """
-        Use FFmpeg to stack text bar on top of video.
-        
-        Final output: 1080x1920 (300px bar + 1620px video)
-        """
-        # FFmpeg command to:
-        # 1. Scale video to 1080x1620 (cropped to fit)
-        # 2. Stack text bar (1080x300) on top
-        # 3. Output combined video
-        
-        cmd = [
-            'ffmpeg', '-y',
-            '-i', video_path,
-            '-i', text_bar_path,
-            '-filter_complex',
-            '[0:v]scale=1080:1620:force_original_aspect_ratio=increase,crop=1080:1620[vid];'
-            '[1:v]scale=1080:300[bar];'
-            '[bar][vid]vstack=inputs=2[out]',
-            '-map', '[out]',
-            '-map', '0:a?',
-            '-c:v', 'libx264',
-            '-preset', 'fast',
-            '-crf', '23',
-            '-c:a', 'aac',
-            output_path
-        ]
-        
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
-        
-        if result.returncode != 0:
-            raise Exception(f"FFmpeg error: {result.stderr}")
-        
-        return output_path
 
-
-def create_preview_image(fact_text, animal_name, output_path=None):
-    """
-    Create a static preview image showing what the video frame would look like.
-    Useful for testing without actually generating video.
-    """
-    width, height = 1080, 1920  # 9:16 aspect ratio
-    bar_height = 300
-    
-    # Create image
-    img = Image.new('RGB', (width, height), color='#1a1a2e')  # Dark background
-    draw = ImageDraw.Draw(img)
-    
-    # White bar at top
-    draw.rectangle([(0, 0), (width, bar_height)], fill='white')
-    
-    # Try to load font
-    try:
-        font_paths = [
-            'C:/Windows/Fonts/arial.ttf',
-            '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
-        ]
-        font = None
-        small_font = None
-        for path in font_paths:
-            if os.path.exists(path):
-                font = ImageFont.truetype(path, 36)
-                small_font = ImageFont.truetype(path, 24)
-                break
-        if not font:
-            font = ImageFont.load_default()
-            small_font = font
-    except:
+    def _fit_text(self, draw, text, font_path, max_width, max_height):
+        size = 60  # Start size (ideal)
+        min_size = 30 # absolute minimum
+        
         font = ImageFont.load_default()
-        small_font = font
-    
-    # Draw fact text on white bar (with wrapping)
-    margin = 40
-    y = 50
-    words = fact_text.split()
-    lines = []
-    current_line = []
-    
-    for word in words:
-        test_line = ' '.join(current_line + [word])
-        bbox = draw.textbbox((0, 0), test_line, font=font)
-        if bbox[2] - bbox[0] > width - (margin * 2):
-            if current_line:
-                lines.append(' '.join(current_line))
-                current_line = [word]
-            else:
-                lines.append(word)
-                current_line = []
-        else:
-            current_line.append(word)
-    if current_line:
-        lines.append(' '.join(current_line))
-    
-    for line in lines[:4]:  # Max 4 lines
-        draw.text((margin, y), line, fill='black', font=font)
-        y += 50
-    
-    # Simulated video area
-    video_area_top = bar_height + 20
-    draw.rectangle(
-        [(40, video_area_top), (width - 40, height - 40)],
-        fill='#16213e',
-        outline='#0f3460',
-        width=2
-    )
-    
-    # Animal name in center
-    animal_text = f"🎬 {animal_name}"
-    bbox = draw.textbbox((0, 0), animal_text, font=font)
-    text_x = (width - (bbox[2] - bbox[0])) // 2
-    text_y = (height + bar_height) // 2
-    draw.text((text_x, text_y), animal_text, fill='white', font=font)
-    
-    # Subtitle
-    subtitle = "[Sora 2 Generated Video]"
-    bbox = draw.textbbox((0, 0), subtitle, font=small_font)
-    text_x = (width - (bbox[2] - bbox[0])) // 2
-    draw.text((text_x, text_y + 60), subtitle, fill='#888888', font=small_font)
-    
-    # Save
-    output_path = output_path or os.path.join(tempfile.gettempdir(), 'preview.png')
-    img.save(output_path)
-    
-    return output_path
+        lines = []
+        
+        # Binary search or just linear decrement
+        while size >= min_size:
+            try:
+                # Handle .ttc or .ttf
+                if font_path.endswith('.ttc'):
+                     # index 0 usually
+                    font = ImageFont.truetype(font_path, size, index=0)
+                else:
+                    font = ImageFont.truetype(font_path, size)
+            except:
+                font = ImageFont.load_default()
+                return font, self._wrap_text(text, font, max_width) # Fallback
+
+            # Try wrapping
+            lines = []
+            words = text.split()
+            if not words: return font, []
+            
+            current_line = words[0]
+            good_pass = True
+            
+            for word in words[1:]:
+                test_line = current_line + " " + word
+                bbox = draw.textbbox((0,0), test_line, font=font)
+                w = bbox[2] - bbox[0]
+                if w < max_width:
+                    current_line = test_line
+                else:
+                    lines.append(current_line)
+                    current_line = word
+            lines.append(current_line)
+            
+            # Check Height
+            total_h = 0
+            for line in lines:
+                bbox = draw.textbbox((0,0), line, font=font)
+                h = bbox[3] - bbox[1]
+                total_h += h + 15 # Line spacing
+            
+            if total_h <= max_height:
+                return font, lines
+                
+            size -= 5 # shrink and retry
+            
+        print(f"⚠️ Text too long even at min size ({min_size}). Truncating or overflowing.")
+        return font, lines
+
+    def _wrap_text(self, text, font, max_width):
+        # Basic wrap for fallback
+        return textwrap.wrap(text, width=30) # rough guess
+
