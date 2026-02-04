@@ -57,7 +57,7 @@ except:
 # FLASK APP SETUP
 # ============================================================
 
-print("🚀 DEPLOYMENT TRIGGER: VIDEO GALLERY V5") # Force Rebuild
+print("🚀 DEPLOYMENT TRIGGER: ADMIN PANEL V1") # Force Rebuild
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', os.urandom(24).hex())
