@@ -1,0 +1,906 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="header">
+    <h1>Animal Facts Admin</h1>
+    <p>Manage workflows, animals, and view outputs</p>
+</div>
+
+<!-- Tab Navigation -->
+<div class="glass-panel" style="padding: 0; margin-bottom: 24px;">
+    <div class="admin-tabs">
+        <button class="tab-btn active" data-tab="status">
+            <i data-lucide="activity"></i> Status
+        </button>
+        <button class="tab-btn" data-tab="gallery">
+            <i data-lucide="video"></i> Video Gallery
+        </button>
+        <button class="tab-btn" data-tab="animals">
+            <i data-lucide="paw-print"></i> Animals
+        </button>
+        <button class="tab-btn" data-tab="scheduler">
+            <i data-lucide="clock"></i> Scheduler
+        </button>
+    </div>
+</div>
+
+<!-- Tab Content -->
+<div class="tab-content">
+    <!-- Status Tab -->
+    <div id="tab-status" class="tab-pane active">
+        <div class="stats-grid">
+            <div class="stat-card glass-panel">
+                <div class="stat-label"><i data-lucide="video"></i> Total Videos</div>
+                <div class="stat-value" id="stat-videos">-</div>
+                <div class="text-gradient">Generated</div>
+            </div>
+            <div class="stat-card glass-panel">
+                <div class="stat-label"><i data-lucide="paw-print"></i> Animals</div>
+                <div class="stat-value" id="stat-animals">-</div>
+                <div class="text-gradient">Available</div>
+            </div>
+            <div class="stat-card glass-panel">
+                <div class="stat-label"><i data-lucide="clock"></i> Scheduler</div>
+                <div class="stat-value" id="stat-scheduler">-</div>
+                <div id="scheduler-status-text" class="text-gradient">Loading...</div>
+            </div>
+        </div>
+
+        <div class="glass-panel" style="padding: 24px;">
+            <h3 style="margin-bottom: 20px;"><i data-lucide="zap"></i> Quick Actions</h3>
+            <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                <button class="btn btn-primary" id="run-now-btn" onclick="runWorkflowNow()">
+                    <i data-lucide="play"></i> Run Now
+                </button>
+                <button class="btn" onclick="loadAllData()">
+                    <i data-lucide="refresh-cw"></i> Refresh Data
+                </button>
+            </div>
+            <div id="run-status" style="margin-top: 16px; padding: 12px; border-radius: 8px; display: none;"></div>
+        </div>
+
+        <!-- Recent Tasks -->
+        <div class="glass-panel" style="padding: 24px; margin-top: 24px;">
+            <h3 style="margin-bottom: 20px;"><i data-lucide="list"></i> Recent Tasks</h3>
+            <div id="recent-tasks" style="max-height: 300px; overflow-y: auto;">
+                <div style="color: var(--text-secondary);">Loading...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Video Gallery Tab -->
+    <div id="tab-gallery" class="tab-pane" style="display: none;">
+        <div class="glass-panel" style="padding: 24px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h3><i data-lucide="video"></i> Generated Videos</h3>
+                <button class="btn" onclick="loadVideos()">
+                    <i data-lucide="refresh-cw"></i> Refresh
+                </button>
+            </div>
+            <div id="video-grid" class="video-grid">
+                <div style="color: var(--text-secondary);">Loading videos...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Animals Tab -->
+    <div id="tab-animals" class="tab-pane" style="display: none;">
+        <!-- Add Animal Form -->
+        <div class="glass-panel" style="padding: 24px; margin-bottom: 24px;">
+            <h3 style="margin-bottom: 20px;"><i data-lucide="plus-circle"></i> Add New Animal</h3>
+            <form id="add-animal-form" onsubmit="addAnimal(event)">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Name *</label>
+                        <input type="text" id="animal-name" class="form-input" placeholder="e.g. Red Panda" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Habitat</label>
+                        <input type="text" id="animal-habitat" class="form-input" placeholder="e.g. Himalayan Forest">
+                    </div>
+                    <div class="form-group" style="grid-column: 1 / -1;">
+                        <label>Prompt Style</label>
+                        <input type="text" id="animal-prompt" class="form-input" placeholder="e.g. climbing a tree branch">
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary" style="margin-top: 16px;">
+                    <i data-lucide="plus"></i> Add Animal
+                </button>
+            </form>
+        </div>
+
+        <!-- Animals List -->
+        <div class="glass-panel" style="padding: 24px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h3><i data-lucide="list"></i> Animals (<span id="animals-count">0</span>)</h3>
+                <input type="text" id="animal-search" class="form-input" placeholder="Search animals..."
+                       style="width: 250px;" oninput="filterAnimals()">
+            </div>
+            <div id="animals-list" style="max-height: 500px; overflow-y: auto;">
+                <div style="color: var(--text-secondary);">Loading animals...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scheduler Tab -->
+    <div id="tab-scheduler" class="tab-pane" style="display: none;">
+        <div class="glass-panel" style="padding: 24px; margin-bottom: 24px;">
+            <h3 style="margin-bottom: 20px;"><i data-lucide="settings"></i> Scheduler Settings</h3>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Status</label>
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="scheduler-toggle" onchange="toggleScheduler()">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span id="scheduler-enabled-text">Disabled</span>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Interval (hours)</label>
+                    <select id="scheduler-interval" class="form-input" onchange="updateSchedulerInterval()">
+                        <option value="1">Every 1 hour (24 posts/day)</option>
+                        <option value="2">Every 2 hours (12 posts/day)</option>
+                        <option value="4">Every 4 hours (6 posts/day)</option>
+                        <option value="6" selected>Every 6 hours (4 posts/day)</option>
+                        <option value="8">Every 8 hours (3 posts/day)</option>
+                        <option value="12">Every 12 hours (2 posts/day)</option>
+                        <option value="24">Every 24 hours (1 post/day)</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Scheduler Logs -->
+        <div class="glass-panel" style="padding: 24px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h3><i data-lucide="scroll-text"></i> Recent Logs</h3>
+                <button class="btn" onclick="loadSchedulerLogs()">
+                    <i data-lucide="refresh-cw"></i> Refresh
+                </button>
+            </div>
+            <div id="scheduler-logs" style="max-height: 400px; overflow-y: auto; font-family: monospace; font-size: 0.85rem;">
+                <div style="color: var(--text-secondary);">Loading logs...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .admin-tabs {
+        display: flex;
+        gap: 0;
+        border-bottom: 1px solid var(--glass-border);
+    }
+
+    .tab-btn {
+        flex: 1;
+        padding: 16px 20px;
+        background: transparent;
+        border: none;
+        color: var(--text-secondary);
+        font-size: 0.95rem;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        transition: all 0.3s ease;
+        border-bottom: 2px solid transparent;
+    }
+
+    .tab-btn:hover {
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--text-primary);
+    }
+
+    .tab-btn.active {
+        color: var(--accent-primary);
+        border-bottom-color: var(--accent-primary);
+        background: rgba(0, 210, 255, 0.05);
+    }
+
+    .tab-pane {
+        animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .video-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 20px;
+    }
+
+    .video-card {
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid var(--glass-border);
+        transition: transform 0.3s ease, border-color 0.3s ease;
+    }
+
+    .video-card:hover {
+        transform: translateY(-4px);
+        border-color: var(--accent-primary);
+    }
+
+    .video-card video {
+        width: 100%;
+        aspect-ratio: 9/16;
+        object-fit: cover;
+        background: #000;
+    }
+
+    .video-card-info {
+        padding: 12px;
+    }
+
+    .video-card-info .filename {
+        font-size: 0.85rem;
+        color: var(--text-primary);
+        word-break: break-all;
+        margin-bottom: 4px;
+    }
+
+    .video-card-info .meta {
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+    }
+
+    .form-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
+    }
+
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .form-group label {
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+    }
+
+    .form-input {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--glass-border);
+        border-radius: 8px;
+        padding: 10px 14px;
+        color: var(--text-primary);
+        font-size: 0.95rem;
+        outline: none;
+        transition: border-color 0.3s ease;
+    }
+
+    .form-input:focus {
+        border-color: var(--accent-primary);
+    }
+
+    .form-input::placeholder {
+        color: var(--text-secondary);
+        opacity: 0.6;
+    }
+
+    .btn {
+        padding: 10px 20px;
+        border-radius: 8px;
+        border: none;
+        cursor: pointer;
+        font-size: 0.9rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: rgba(255, 255, 255, 0.1);
+        color: var(--text-primary);
+        transition: all 0.3s ease;
+    }
+
+    .btn:hover {
+        background: rgba(255, 255, 255, 0.15);
+        transform: translateY(-1px);
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, var(--accent-secondary), var(--accent-primary));
+    }
+
+    .btn-primary:hover {
+        box-shadow: 0 4px 20px rgba(0, 210, 255, 0.3);
+    }
+
+    .btn-danger {
+        background: rgba(255, 75, 31, 0.2);
+        color: var(--danger);
+    }
+
+    .btn-danger:hover {
+        background: rgba(255, 75, 31, 0.3);
+    }
+
+    .animal-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr auto;
+        gap: 12px;
+        padding: 12px;
+        background: rgba(255, 255, 255, 0.03);
+        border-radius: 8px;
+        margin-bottom: 8px;
+        align-items: center;
+        border: 1px solid transparent;
+        transition: all 0.2s ease;
+    }
+
+    .animal-row:hover {
+        background: rgba(255, 255, 255, 0.06);
+        border-color: var(--glass-border);
+    }
+
+    .animal-row.editing {
+        background: rgba(0, 210, 255, 0.05);
+        border-color: var(--accent-primary);
+    }
+
+    .animal-row input {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--glass-border);
+        border-radius: 4px;
+        padding: 6px 10px;
+        color: var(--text-primary);
+        font-size: 0.9rem;
+    }
+
+    .animal-row .actions {
+        display: flex;
+        gap: 8px;
+    }
+
+    .animal-row .actions button {
+        padding: 6px 12px;
+        font-size: 0.8rem;
+    }
+
+    .toggle-switch {
+        position: relative;
+        display: inline-block;
+        width: 50px;
+        height: 26px;
+    }
+
+    .toggle-switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+
+    .toggle-slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(255, 255, 255, 0.1);
+        transition: 0.3s;
+        border-radius: 26px;
+    }
+
+    .toggle-slider:before {
+        position: absolute;
+        content: "";
+        height: 20px;
+        width: 20px;
+        left: 3px;
+        bottom: 3px;
+        background-color: white;
+        transition: 0.3s;
+        border-radius: 50%;
+    }
+
+    .toggle-switch input:checked + .toggle-slider {
+        background: linear-gradient(135deg, var(--accent-secondary), var(--accent-primary));
+    }
+
+    .toggle-switch input:checked + .toggle-slider:before {
+        transform: translateX(24px);
+    }
+
+    .log-entry {
+        padding: 8px 12px;
+        background: rgba(255, 255, 255, 0.03);
+        border-radius: 4px;
+        margin-bottom: 6px;
+        border-left: 3px solid var(--glass-border);
+    }
+
+    .log-entry.success {
+        border-left-color: var(--success);
+    }
+
+    .log-entry.error {
+        border-left-color: var(--danger);
+    }
+
+    .log-entry .time {
+        color: var(--text-secondary);
+        font-size: 0.75rem;
+    }
+
+    .task-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 12px;
+        background: rgba(255, 255, 255, 0.03);
+        border-radius: 6px;
+        margin-bottom: 6px;
+    }
+
+    .task-row .status {
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+
+    .task-row .status.pending {
+        background: rgba(255, 255, 255, 0.1);
+        color: var(--text-secondary);
+    }
+
+    .task-row .status.processing {
+        background: rgba(0, 210, 255, 0.2);
+        color: var(--accent-primary);
+    }
+
+    .task-row .status.completed {
+        background: rgba(0, 255, 135, 0.2);
+        color: var(--success);
+    }
+
+    .task-row .status.failed {
+        background: rgba(255, 75, 31, 0.2);
+        color: var(--danger);
+    }
+
+    .text-gradient {
+        background: linear-gradient(to right, var(--accent-primary), var(--accent-secondary));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        font-size: 0.85rem;
+    }
+
+    @media (max-width: 768px) {
+        .admin-tabs {
+            flex-wrap: wrap;
+        }
+
+        .tab-btn {
+            flex: 1 1 50%;
+        }
+
+        .animal-row {
+            grid-template-columns: 1fr;
+            gap: 8px;
+        }
+
+        .video-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Global state
+    let allAnimals = [];
+
+    // Tab switching
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            // Remove active from all tabs
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-pane').forEach(p => p.style.display = 'none');
+
+            // Activate clicked tab
+            btn.classList.add('active');
+            const tabId = 'tab-' + btn.dataset.tab;
+            document.getElementById(tabId).style.display = 'block';
+
+            // Load data for specific tabs
+            if (btn.dataset.tab === 'gallery') loadVideos();
+            if (btn.dataset.tab === 'animals') loadAnimals();
+            if (btn.dataset.tab === 'scheduler') loadSchedulerData();
+        });
+    });
+
+    // Load all data on page load
+    document.addEventListener('DOMContentLoaded', () => {
+        loadAllData();
+    });
+
+    async function loadAllData() {
+        await Promise.all([
+            loadStats(),
+            loadRecentTasks(),
+            loadSchedulerData()
+        ]);
+    }
+
+    async function loadStats() {
+        try {
+            const [animalsRes, videosRes, schedulerRes] = await Promise.all([
+                fetch('/api/animal-facts/animals'),
+                fetch('/api/admin/videos'),
+                fetch('/api/scheduler/schedules')
+            ]);
+
+            const animals = await animalsRes.json();
+            const videos = await videosRes.json();
+            const scheduler = await schedulerRes.json();
+
+            document.getElementById('stat-animals').textContent = animals.animals?.length || 0;
+            document.getElementById('stat-videos').textContent = videos.count || 0;
+
+            const schedule = scheduler.schedules?.find(s => s.workflow_type === 'animal_facts');
+            if (schedule) {
+                document.getElementById('stat-scheduler').textContent = schedule.enabled ? 'ON' : 'OFF';
+                document.getElementById('scheduler-status-text').textContent =
+                    schedule.enabled ? `Every ${schedule.interval_hours}h` : 'Disabled';
+            }
+        } catch (e) {
+            console.error('Error loading stats:', e);
+        }
+    }
+
+    async function loadRecentTasks() {
+        try {
+            const res = await fetch('/api/tasks');
+            const data = await res.json();
+
+            const container = document.getElementById('recent-tasks');
+            if (!data.tasks || data.tasks.length === 0) {
+                container.innerHTML = '<div style="color: var(--text-secondary);">No tasks yet</div>';
+                return;
+            }
+
+            container.innerHTML = data.tasks.slice(0, 10).map(task => `
+                <div class="task-row">
+                    <div>
+                        <div style="font-weight: 500;">${task.animal || 'Unknown'}</div>
+                        <div style="font-size: 0.8rem; color: var(--text-secondary);">
+                            ${new Date(task.created_at).toLocaleString()}
+                        </div>
+                    </div>
+                    <span class="status ${task.status}">${task.status}</span>
+                </div>
+            `).join('');
+        } catch (e) {
+            console.error('Error loading tasks:', e);
+        }
+    }
+
+    async function loadVideos() {
+        try {
+            const res = await fetch('/api/admin/videos');
+            const data = await res.json();
+
+            const container = document.getElementById('video-grid');
+            if (!data.videos || data.videos.length === 0) {
+                container.innerHTML = '<div style="color: var(--text-secondary);">No videos generated yet</div>';
+                return;
+            }
+
+            container.innerHTML = data.videos.map(video => `
+                <div class="video-card">
+                    <video src="${video.url}" controls preload="metadata"></video>
+                    <div class="video-card-info">
+                        <div class="filename">${video.filename}</div>
+                        <div class="meta">
+                            ${formatBytes(video.size)} | ${new Date(video.created_at).toLocaleDateString()}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        } catch (e) {
+            console.error('Error loading videos:', e);
+            document.getElementById('video-grid').innerHTML =
+                '<div style="color: var(--danger);">Error loading videos</div>';
+        }
+    }
+
+    async function loadAnimals() {
+        try {
+            const res = await fetch('/api/animal-facts/animals');
+            const data = await res.json();
+            allAnimals = data.animals || [];
+
+            document.getElementById('animals-count').textContent = allAnimals.length;
+            renderAnimals(allAnimals);
+        } catch (e) {
+            console.error('Error loading animals:', e);
+        }
+    }
+
+    function renderAnimals(animals) {
+        const container = document.getElementById('animals-list');
+        if (animals.length === 0) {
+            container.innerHTML = '<div style="color: var(--text-secondary);">No animals found</div>';
+            return;
+        }
+
+        container.innerHTML = animals.map(animal => `
+            <div class="animal-row" id="animal-${animal.id}">
+                <div>
+                    <strong>${animal.name}</strong>
+                    <div style="font-size: 0.8rem; color: var(--text-secondary);">${animal.id}</div>
+                </div>
+                <div style="color: var(--text-secondary);">${animal.habitat || '-'}</div>
+                <div style="color: var(--text-secondary); font-size: 0.85rem;">${animal.prompt_style || '-'}</div>
+                <div class="actions">
+                    <button class="btn" onclick="editAnimal('${animal.id}')">
+                        <i data-lucide="pencil" style="width: 14px; height: 14px;"></i>
+                    </button>
+                    <button class="btn btn-danger" onclick="deleteAnimal('${animal.id}', '${animal.name}')">
+                        <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
+                    </button>
+                </div>
+            </div>
+        `).join('');
+
+        lucide.createIcons();
+    }
+
+    function filterAnimals() {
+        const query = document.getElementById('animal-search').value.toLowerCase();
+        const filtered = allAnimals.filter(a =>
+            a.name.toLowerCase().includes(query) ||
+            a.habitat?.toLowerCase().includes(query) ||
+            a.id.toLowerCase().includes(query)
+        );
+        renderAnimals(filtered);
+    }
+
+    async function addAnimal(e) {
+        e.preventDefault();
+
+        const data = {
+            name: document.getElementById('animal-name').value,
+            habitat: document.getElementById('animal-habitat').value,
+            prompt_style: document.getElementById('animal-prompt').value
+        };
+
+        try {
+            const res = await fetch('/api/admin/animals', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            const result = await res.json();
+            if (result.error) {
+                alert('Error: ' + result.error);
+                return;
+            }
+
+            // Clear form and reload
+            document.getElementById('add-animal-form').reset();
+            loadAnimals();
+            loadStats();
+        } catch (e) {
+            console.error('Error adding animal:', e);
+            alert('Failed to add animal');
+        }
+    }
+
+    function editAnimal(animalId) {
+        const animal = allAnimals.find(a => a.id === animalId);
+        if (!animal) return;
+
+        const row = document.getElementById('animal-' + animalId);
+        row.classList.add('editing');
+        row.innerHTML = `
+            <input type="text" id="edit-name-${animalId}" value="${animal.name}" placeholder="Name">
+            <input type="text" id="edit-habitat-${animalId}" value="${animal.habitat || ''}" placeholder="Habitat">
+            <input type="text" id="edit-prompt-${animalId}" value="${animal.prompt_style || ''}" placeholder="Prompt style">
+            <div class="actions">
+                <button class="btn btn-primary" onclick="saveAnimal('${animalId}')">Save</button>
+                <button class="btn" onclick="loadAnimals()">Cancel</button>
+            </div>
+        `;
+    }
+
+    async function saveAnimal(animalId) {
+        const data = {
+            name: document.getElementById('edit-name-' + animalId).value,
+            habitat: document.getElementById('edit-habitat-' + animalId).value,
+            prompt_style: document.getElementById('edit-prompt-' + animalId).value
+        };
+
+        try {
+            const res = await fetch('/api/admin/animals/' + animalId, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            const result = await res.json();
+            if (result.error) {
+                alert('Error: ' + result.error);
+                return;
+            }
+
+            loadAnimals();
+        } catch (e) {
+            console.error('Error saving animal:', e);
+            alert('Failed to save animal');
+        }
+    }
+
+    async function deleteAnimal(animalId, animalName) {
+        if (!confirm(`Delete "${animalName}"? This cannot be undone.`)) return;
+
+        try {
+            const res = await fetch('/api/admin/animals/' + animalId, {
+                method: 'DELETE'
+            });
+
+            const result = await res.json();
+            if (result.error) {
+                alert('Error: ' + result.error);
+                return;
+            }
+
+            loadAnimals();
+            loadStats();
+        } catch (e) {
+            console.error('Error deleting animal:', e);
+            alert('Failed to delete animal');
+        }
+    }
+
+    async function loadSchedulerData() {
+        try {
+            const res = await fetch('/api/scheduler/schedules');
+            const data = await res.json();
+
+            const schedule = data.schedules?.find(s => s.workflow_type === 'animal_facts');
+            if (schedule) {
+                document.getElementById('scheduler-toggle').checked = schedule.enabled;
+                document.getElementById('scheduler-enabled-text').textContent = schedule.enabled ? 'Enabled' : 'Disabled';
+                document.getElementById('scheduler-interval').value = schedule.interval_hours || 6;
+            }
+
+            loadSchedulerLogs();
+        } catch (e) {
+            console.error('Error loading scheduler data:', e);
+        }
+    }
+
+    async function loadSchedulerLogs() {
+        try {
+            const res = await fetch('/api/scheduler/logs?limit=20');
+            const data = await res.json();
+
+            const container = document.getElementById('scheduler-logs');
+            if (!data.logs || data.logs.length === 0) {
+                container.innerHTML = '<div style="color: var(--text-secondary);">No logs yet</div>';
+                return;
+            }
+
+            container.innerHTML = data.logs.map(log => `
+                <div class="log-entry ${log.status || ''}">
+                    <div class="time">${new Date(log.timestamp).toLocaleString()}</div>
+                    <div>${log.message || log.action || 'Scheduler event'}</div>
+                </div>
+            `).join('');
+        } catch (e) {
+            console.error('Error loading logs:', e);
+        }
+    }
+
+    async function toggleScheduler() {
+        const enabled = document.getElementById('scheduler-toggle').checked;
+        document.getElementById('scheduler-enabled-text').textContent = enabled ? 'Enabled' : 'Disabled';
+
+        try {
+            await fetch('/api/scheduler/schedules', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    workflow_type: 'animal_facts',
+                    interval_hours: parseInt(document.getElementById('scheduler-interval').value),
+                    enabled: enabled
+                })
+            });
+
+            loadStats();
+        } catch (e) {
+            console.error('Error toggling scheduler:', e);
+        }
+    }
+
+    async function updateSchedulerInterval() {
+        const interval = parseInt(document.getElementById('scheduler-interval').value);
+        const enabled = document.getElementById('scheduler-toggle').checked;
+
+        try {
+            await fetch('/api/scheduler/schedules', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    workflow_type: 'animal_facts',
+                    interval_hours: interval,
+                    enabled: enabled
+                })
+            });
+
+            loadStats();
+        } catch (e) {
+            console.error('Error updating interval:', e);
+        }
+    }
+
+    async function runWorkflowNow() {
+        const btn = document.getElementById('run-now-btn');
+        const statusDiv = document.getElementById('run-status');
+
+        btn.disabled = true;
+        btn.innerHTML = '<i data-lucide="loader"></i> Starting...';
+        statusDiv.style.display = 'block';
+        statusDiv.style.background = 'rgba(0, 210, 255, 0.1)';
+        statusDiv.innerHTML = 'Starting workflow...';
+
+        try {
+            const res = await fetch('/api/animal-facts/run', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+            });
+
+            const result = await res.json();
+
+            if (result.error) {
+                statusDiv.style.background = 'rgba(255, 75, 31, 0.1)';
+                statusDiv.innerHTML = 'Error: ' + result.error;
+            } else {
+                statusDiv.style.background = 'rgba(0, 255, 135, 0.1)';
+                statusDiv.innerHTML = `
+                    <strong>Task started!</strong><br>
+                    Task ID: ${result.task_id || 'N/A'}<br>
+                    Animal: ${result.animal || 'Random'}
+                `;
+
+                // Reload tasks after a short delay
+                setTimeout(() => {
+                    loadRecentTasks();
+                    loadStats();
+                }, 2000);
+            }
+        } catch (e) {
+            statusDiv.style.background = 'rgba(255, 75, 31, 0.1)';
+            statusDiv.innerHTML = 'Failed to start workflow: ' + e.message;
+        }
+
+        btn.disabled = false;
+        btn.innerHTML = '<i data-lucide="play"></i> Run Now';
+        lucide.createIcons();
+    }
+
+    function formatBytes(bytes) {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    }
+</script>
+{% endblock %}

@@ -888,6 +888,145 @@ def api_list_tasks():
         return jsonify({'error': str(e), 'tasks': []}), 200
 
 
+# ============================================================
+# ADMIN PANEL
+# ============================================================
+
+@app.route('/admin')
+def admin_page():
+    """Admin panel for managing workflows, animals, and videos"""
+    return render_template('admin.html', page='admin')
+
+
+def load_animals():
+    """Load animals from JSON file"""
+    animals_path = os.path.join(os.path.dirname(__file__), 'data', 'animals.json')
+    if os.path.exists(animals_path):
+        with open(animals_path, 'r') as f:
+            return json.load(f)
+    return {'animals': []}
+
+
+def save_animals(data):
+    """Save animals to JSON file"""
+    animals_path = os.path.join(os.path.dirname(__file__), 'data', 'animals.json')
+    os.makedirs(os.path.dirname(animals_path), exist_ok=True)
+    with open(animals_path, 'w') as f:
+        json.dump(data, f, indent=4)
+
+
+@app.route('/api/admin/animals', methods=['POST'])
+def api_admin_create_animal():
+    """Create a new animal"""
+    try:
+        data = request.json or {}
+
+        # Validate required fields
+        if not data.get('name'):
+            return jsonify({'error': 'Name is required'}), 400
+
+        # Generate ID from name if not provided
+        animal_id = data.get('id') or data['name'].lower().replace(' ', '_').replace('-', '_')
+
+        new_animal = {
+            'id': animal_id,
+            'name': data['name'],
+            'habitat': data.get('habitat', ''),
+            'prompt_style': data.get('prompt_style', '')
+        }
+
+        # Load existing animals and add new one
+        animals_data = load_animals()
+
+        # Check for duplicate ID
+        if any(a['id'] == animal_id for a in animals_data.get('animals', [])):
+            return jsonify({'error': f'Animal with ID "{animal_id}" already exists'}), 400
+
+        animals_data.setdefault('animals', []).append(new_animal)
+        save_animals(animals_data)
+
+        return jsonify({'success': True, 'animal': new_animal})
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/admin/animals/<animal_id>', methods=['PUT'])
+def api_admin_update_animal(animal_id):
+    """Update an existing animal"""
+    try:
+        data = request.json or {}
+        animals_data = load_animals()
+
+        # Find and update animal
+        found = False
+        for animal in animals_data.get('animals', []):
+            if animal['id'] == animal_id:
+                animal['name'] = data.get('name', animal['name'])
+                animal['habitat'] = data.get('habitat', animal['habitat'])
+                animal['prompt_style'] = data.get('prompt_style', animal['prompt_style'])
+                found = True
+                updated_animal = animal
+                break
+
+        if not found:
+            return jsonify({'error': 'Animal not found'}), 404
+
+        save_animals(animals_data)
+        return jsonify({'success': True, 'animal': updated_animal})
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/admin/animals/<animal_id>', methods=['DELETE'])
+def api_admin_delete_animal(animal_id):
+    """Delete an animal"""
+    try:
+        animals_data = load_animals()
+
+        # Find and remove animal
+        original_count = len(animals_data.get('animals', []))
+        animals_data['animals'] = [a for a in animals_data.get('animals', []) if a['id'] != animal_id]
+
+        if len(animals_data['animals']) == original_count:
+            return jsonify({'error': 'Animal not found'}), 404
+
+        save_animals(animals_data)
+        return jsonify({'success': True})
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/admin/videos', methods=['GET'])
+def api_admin_list_videos():
+    """List all generated videos with metadata"""
+    try:
+        video_dir = os.path.join(app.root_path, 'static', 'videos')
+        os.makedirs(video_dir, exist_ok=True)
+
+        videos = []
+        for f in os.listdir(video_dir):
+            if f.endswith('.mp4'):
+                filepath = os.path.join(video_dir, f)
+                stat = os.stat(filepath)
+                videos.append({
+                    'filename': f,
+                    'url': f'/static/videos/{f}',
+                    'size': stat.st_size,
+                    'created_at': datetime.fromtimestamp(stat.st_mtime).isoformat()
+                })
+
+        # Sort by creation date, newest first
+        videos.sort(key=lambda x: x['created_at'], reverse=True)
+
+        return jsonify({'videos': videos, 'count': len(videos)})
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/health')
 def health():
     """Health check"""
