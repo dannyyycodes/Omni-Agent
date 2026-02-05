@@ -1195,6 +1195,65 @@ def api_get_failed_tasks():
 
 
 # ============================================================
+# ALERTING TEST
+# ============================================================
+
+@app.route('/api/alert/test', methods=['POST'])
+def api_test_alert():
+    """Test the Telegram alerter"""
+    try:
+        from core.alerter import get_alerter
+        import os
+
+        alerter = get_alerter()
+
+        # Check if configured
+        bot_token = os.environ.get('TELEGRAM_BOT_TOKEN')
+        user_id = os.environ.get('TELEGRAM_ALERT_USER_ID')
+
+        if not bot_token or not user_id:
+            return jsonify({
+                'success': False,
+                'error': 'Missing env vars',
+                'TELEGRAM_BOT_TOKEN': 'SET' if bot_token else 'MISSING',
+                'TELEGRAM_ALERT_USER_ID': 'SET' if user_id else 'MISSING'
+            }), 400
+
+        # Send test alert
+        result = alerter.send_alert(
+            "🧪 *TEST ALERT*\n\n"
+            "If you see this, proactive alerts are working!\n\n"
+            "You'll now receive automatic notifications when:\n"
+            "- Tasks fail\n"
+            "- Tasks get stuck\n"
+            "- Services have errors"
+        )
+
+        return jsonify({
+            'success': result,
+            'message': 'Test alert sent!' if result else 'Failed to send alert',
+            'alerter_enabled': alerter.enabled
+        })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/alert/status', methods=['GET'])
+def api_alert_status():
+    """Check alerter configuration status"""
+    import os
+    bot_token = os.environ.get('TELEGRAM_BOT_TOKEN')
+    user_id = os.environ.get('TELEGRAM_ALERT_USER_ID')
+
+    return jsonify({
+        'TELEGRAM_BOT_TOKEN': 'configured' if bot_token else 'missing',
+        'TELEGRAM_ALERT_USER_ID': 'configured' if user_id else 'missing',
+        'alerts_enabled': bool(bot_token and user_id)
+    })
+
+
+# ============================================================
 # ADMIN PANEL
 # ============================================================
 
