@@ -796,6 +796,87 @@ def api_test_overlay():
         }), 500
 
 
+@app.route('/api/animal-facts/test-pexels', methods=['POST'])
+def api_test_pexels():
+    """
+    Test the full Pexels pipeline - fetch video, add overlay, return result.
+    Bypasses Sora completely for testing.
+    """
+    try:
+        from core.pexels_client import get_pexels_client
+        from utils.video_composer import VideoComposer
+
+        data = request.json or {}
+        animal_name = data.get('animal', 'Red Panda')
+        fact_text = data.get('fact', f'Did you know that {animal_name}s are amazing creatures?')
+        dry_run = data.get('dry_run', True)
+
+        # 1. Get video from Pexels
+        print(f"🔍 Searching Pexels for: {animal_name}")
+        pexels = get_pexels_client()
+
+        if not pexels.is_available():
+            return jsonify({'error': 'PEXELS_API_KEY not configured'}), 500
+
+        pexels_result = pexels.get_animal_video(animal_name)
+        if not pexels_result:
+            return jsonify({'error': f'No Pexels video found for {animal_name}'}), 404
+
+        video_url = pexels_result['video_url']
+        print(f"✅ Found Pexels video: {video_url[:50]}...")
+
+        # 2. Add text overlay
+        print(f"🎨 Adding text overlay...")
+        composer = VideoComposer()
+        output_filename = f"pexels_test_{datetime.now().strftime('%Y%m%d_%H%M%S')}.mp4"
+
+        final_video = composer.add_fact_overlay(
+            video_url=video_url,
+            fact_text=fact_text,
+            animal_name=animal_name,
+            output_filename=output_filename
+        )
+
+        # 3. Optionally post to Blotato
+        posted = False
+        if not dry_run:
+            blotato_key = os.environ.get('BLOTATO_API_KEY')
+            if blotato_key:
+                try:
+                    from workflows.animal_facts import AnimalFactsWorkflow
+                    workflow = AnimalFactsWorkflow(api_hub, model_router)
+                    caption = f"🐾 Did you know? {fact_text[:100]}... #animals #facts #wildlife"
+                    workflow._post_blotato(blotato_key, final_video, caption)
+                    posted = True
+                    print("✅ Posted to social media!")
+                except Exception as e:
+                    print(f"⚠️ Posting failed: {e}")
+
+        # Return result
+        video_serve_url = f"/static/videos/{os.path.basename(final_video)}" if final_video else None
+
+        return jsonify({
+            'status': 'success',
+            'message': f'Pexels video ready for {animal_name}!',
+            'animal': animal_name,
+            'fact': fact_text,
+            'video_url': video_serve_url,
+            'full_path': final_video,
+            'pexels_source': video_url,
+            'video_source': 'pexels',
+            'posted': posted,
+            'dry_run': dry_run
+        })
+
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'status': 'error',
+            'message': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
+
+
 # ============================================================
 # THEME ENDPOINTS
 # ============================================================
