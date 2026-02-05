@@ -1,6 +1,8 @@
 """
 Pexels Video Client - Fetches stock wildlife footage
 Used as fallback when Sora is unavailable
+
+IMPORTANT: Only returns REAL wildlife footage - no puppets, cartoons, animations, toys
 """
 
 import os
@@ -10,9 +12,24 @@ import random
 
 logger = logging.getLogger(__name__)
 
+# Keywords that indicate FAKE content (puppets, toys, cartoons, etc.)
+FAKE_CONTENT_KEYWORDS = [
+    'puppet', 'toy', 'plush', 'stuffed', 'cartoon', 'animation', 'animated',
+    'drawing', 'illustration', 'sketch', 'art', 'painting', 'cgi', '3d',
+    'render', 'digital', 'graphic', 'doll', 'figurine', 'model', 'miniature',
+    'claymation', 'stop motion', 'mascot', 'costume', 'suit', 'fake'
+]
+
+# Keywords that indicate REAL wildlife footage
+REAL_WILDLIFE_KEYWORDS = [
+    'wildlife', 'wild', 'nature', 'documentary', 'safari', 'habitat',
+    'forest', 'ocean', 'jungle', 'savanna', 'arctic', 'zoo', 'sanctuary',
+    'national park', 'reserve', 'natural', 'outdoor'
+]
+
 
 class PexelsClient:
-    """Fetch videos from Pexels API"""
+    """Fetch videos from Pexels API - ONLY real wildlife footage"""
 
     def __init__(self):
         self.api_key = os.environ.get('PEXELS_API_KEY')
@@ -66,14 +83,22 @@ class PexelsClient:
                 logger.info(f"No results for '{query}', trying broader search...")
                 return self._broader_search(query, orientation, min_duration, headers)
 
-            # Filter by duration and pick a random one for variety
-            suitable_videos = [
-                v for v in videos
-                if v.get("duration", 0) >= min_duration
-            ]
+            # Filter by duration AND ensure it's REAL wildlife footage
+            suitable_videos = []
+            for v in videos:
+                if v.get("duration", 0) >= min_duration:
+                    if self._is_real_wildlife(v):
+                        suitable_videos.append(v)
 
             if not suitable_videos:
-                suitable_videos = videos  # Use any if none meet duration
+                # Second pass: check all videos regardless of duration
+                for v in videos:
+                    if self._is_real_wildlife(v):
+                        suitable_videos.append(v)
+
+            if not suitable_videos:
+                logger.warning(f"No REAL wildlife videos found for '{query}', trying broader search...")
+                return self._broader_search(query, orientation, min_duration, headers)
 
             video = random.choice(suitable_videos)
 
@@ -101,14 +126,52 @@ class PexelsClient:
             logger.error(f"Pexels search failed: {e}")
             return None
 
+    def _is_real_wildlife(self, video: dict) -> bool:
+        """
+        Check if a video appears to be REAL wildlife footage.
+        Filters out puppets, toys, cartoons, animations, etc.
+        """
+        # Get all text content to check
+        url = video.get("url", "").lower()
+        user = video.get("user", {}).get("name", "").lower()
+
+        # Check video files for suspicious URLs
+        for vf in video.get("video_files", []):
+            file_url = vf.get("link", "").lower()
+            for keyword in FAKE_CONTENT_KEYWORDS:
+                if keyword in file_url:
+                    logger.debug(f"Filtered out video {video.get('id')}: '{keyword}' in URL")
+                    return False
+
+        # Check the Pexels URL for fake content keywords
+        for keyword in FAKE_CONTENT_KEYWORDS:
+            if keyword in url:
+                logger.debug(f"Filtered out video {video.get('id')}: '{keyword}' in Pexels URL")
+                return False
+
+        # Check uploader name (some uploaders specialize in animations)
+        animation_uploaders = ['animation', 'cartoon', 'puppet', 'toy', 'art', 'digital']
+        for term in animation_uploaders:
+            if term in user:
+                logger.debug(f"Filtered out video {video.get('id')}: suspicious uploader '{user}'")
+                return False
+
+        # Video passed all checks
+        return True
+
     def _broader_search(self, query: str, orientation: str, min_duration: int, headers: dict) -> dict:
-        """Try broader search terms if specific search fails"""
-        # Extract main animal word and try variations
+        """Try broader search terms if specific search fails - still filters for REAL wildlife"""
+        # Extract main animal word and try variations with "real wildlife" focus
         words = query.lower().split()
+        animal_word = words[0] if words else query
+
         broader_terms = [
-            f"{words[0]} animal" if words else query,
-            "wildlife nature",
-            "animal documentary"
+            f"{animal_word} wild nature",
+            f"{animal_word} wildlife documentary",
+            f"{animal_word} in nature",
+            "wildlife documentary",
+            "wild animals nature",
+            "safari wildlife"
         ]
 
         for term in broader_terms:
@@ -119,19 +182,24 @@ class PexelsClient:
                     params={
                         "query": term,
                         "orientation": orientation,
-                        "per_page": 10
+                        "per_page": 20  # More results to filter from
                     },
                     timeout=30
                 )
 
                 if response.status_code == 200:
                     videos = response.json().get("videos", [])
-                    if videos:
-                        video = random.choice(videos)
+
+                    # Filter for REAL wildlife
+                    real_videos = [v for v in videos if self._is_real_wildlife(v)]
+
+                    if real_videos:
+                        video = random.choice(real_videos)
                         video_files = video.get("video_files", [])
                         best_file = self._pick_best_file(video_files, orientation)
 
                         if best_file:
+                            logger.info(f"Found real wildlife video via broader search: {term}")
                             return {
                                 "video_url": best_file.get("link"),
                                 "duration": video.get("duration"),
@@ -176,25 +244,53 @@ class PexelsClient:
         # Fallback to first available
         return sorted_files[0] if sorted_files else None
 
-    def get_animal_video(self, animal_name: str) -> dict:
+    def get_animal_video(self, animal_name: str, fallback_to_other_animal: bool = True) -> dict:
         """
-        Get a video for a specific animal.
-        Tries multiple search strategies.
+        Get a REAL wildlife video for a specific animal.
+        Only returns actual nature footage - no puppets, cartoons, or fake content.
+
+        Args:
+            animal_name: Name of the animal to search for
+            fallback_to_other_animal: If True, will try generic wildlife if animal not found
+
+        Returns:
+            dict with video info or None if no REAL wildlife found
         """
-        # Try specific animal name first
+        logger.info(f"Searching for REAL {animal_name} wildlife footage...")
+
+        # Search terms optimized for REAL wildlife (not toys/puppets/cartoons)
         search_terms = [
-            f"{animal_name} wildlife",
-            f"{animal_name} nature",
-            animal_name,
-            f"{animal_name} animal"
+            f"{animal_name} wild nature",
+            f"{animal_name} wildlife documentary",
+            f"{animal_name} in habitat",
+            f"wild {animal_name}",
+            f"{animal_name} safari",
+            f"{animal_name} zoo",  # Zoo footage is still real
         ]
 
         for term in search_terms:
             result = self.search_video(term, orientation="portrait", min_duration=8)
             if result:
+                logger.info(f"Found REAL wildlife video for {animal_name}")
                 return result
 
-        logger.warning(f"No Pexels video found for {animal_name}")
+        # If specific animal not found and fallback enabled, try generic wildlife
+        if fallback_to_other_animal:
+            logger.warning(f"No real footage for {animal_name}, trying generic wildlife...")
+            generic_terms = [
+                "wildlife documentary nature",
+                "wild animals safari",
+                "nature documentary animals",
+                "rainforest wildlife",
+                "ocean wildlife"
+            ]
+            for term in generic_terms:
+                result = self.search_video(term, orientation="portrait", min_duration=8)
+                if result:
+                    logger.info(f"Using generic wildlife footage instead of {animal_name}")
+                    return result
+
+        logger.warning(f"No REAL Pexels video found for {animal_name}")
         return None
 
 
