@@ -1253,6 +1253,73 @@ def api_alert_status():
     })
 
 
+@app.route('/api/debug/process-tasks', methods=['POST'])
+def api_debug_process_tasks():
+    """Manually trigger video task processor for debugging"""
+    try:
+        from core.video_task_processor import get_processor
+        import traceback
+
+        processor = get_processor()
+
+        # Get current tasks before processing
+        from core.memory import PendingVideoTask, HAS_SQLALCHEMY
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+
+        db_url = get_db_url()
+        engine = create_engine(db_url)
+        Session = sessionmaker(bind=engine)
+        session = Session()
+
+        tasks_before = session.query(PendingVideoTask).filter(
+            PendingVideoTask.status.in_(['pending', 'processing'])
+        ).all()
+
+        tasks_info = [{
+            'task_id': t.task_id[:12],
+            'animal': t.animal_name,
+            'status': t.status,
+            'error': t.error_message
+        } for t in tasks_before]
+
+        session.close()
+
+        # Process tasks
+        try:
+            processor.process_pending_tasks()
+            process_result = "Success"
+        except Exception as e:
+            process_result = f"Error: {str(e)}\n{traceback.format_exc()}"
+
+        # Get tasks after processing
+        Session2 = sessionmaker(bind=engine)
+        session2 = Session2()
+
+        tasks_after = session2.query(PendingVideoTask).filter(
+            PendingVideoTask.status.in_(['pending', 'processing', 'failed', 'dead_letter'])
+        ).order_by(PendingVideoTask.created_at.desc()).limit(5).all()
+
+        tasks_after_info = [{
+            'task_id': t.task_id[:12],
+            'animal': t.animal_name,
+            'status': t.status,
+            'error': t.error_message
+        } for t in tasks_after]
+
+        session2.close()
+
+        return jsonify({
+            'tasks_before': tasks_info,
+            'process_result': process_result,
+            'tasks_after': tasks_after_info
+        })
+
+    except Exception as e:
+        import traceback
+        return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
+
+
 # ============================================================
 # ADMIN PANEL
 # ============================================================
