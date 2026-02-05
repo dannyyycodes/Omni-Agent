@@ -1,0 +1,42 @@
+{
+    "themes": [
+        {
+            "id": "animal_facts",
+            "name": "Animal Facts",
+            "description": "Fascinating facts about wildlife with hyper-realistic AI video",
+            "content_prompt": "Generate ONE fascinating, little-known fact about {animal}. Start with 'Did you know'. Keep it under 100 words. Make it surprising and shareable. Include a specific number or stat if possible.",
+            "animal_prompt": "Pick ONE random animal that would make a visually stunning short video. Choose from: mammals, birds, marine life, reptiles, insects. Return JSON: {\"name\": \"Animal Name\", \"habitat\": \"Where it lives\", \"visual_style\": \"how it looks/moves\"}",
+            "visual_style": "hyper-realistic, nature documentary quality, cinematic 4K, detailed textures, natural lighting",
+            "sora_template": "Hyper-realistic {animal} {visual_style}. Nature documentary style, 4K cinematic quality, smooth motion, {habitat} environment. No text, no humans.",
+            "video_source": "sora",
+            "video_source_config": {},
+            "schedule_hours": 6,
+            "enabled": true,
+            "platforms": ["tiktok", "instagram", "youtube_shorts"],
+            "hashtags": ["animals", "facts", "wildlife", "nature", "didyouknow"],
+            "created_at": "2024-01-01T00:00:00Z"
+        }
+    ],
+    "video_sources": {
+        "sora": {
+            "name": "Sora AI (via Kie.ai)",
+            "description": "AI-generated hyper-realistic video",
+            "requires_api": "KIE_API_KEY"
+        },
+        "pexels": {
+            "name": "Pexels Stock",
+            "description": "Free stock footage from Pexels",
+            "requires_api": "PEXELS_API_KEY"
+        },
+        "storyblocks": {
+            "name": "Storyblocks Premium",
+            "description": "Premium stock footage",
+            "requires_api": "STORYBLOCKS_API_KEY"
+        },
+        "manual": {
+            "name": "Manual Upload",
+            "description": "User provides video URL",
+            "requires_api": null
+        }
+    }
+}

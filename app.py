@@ -797,6 +797,175 @@ def api_test_overlay():
 
 
 # ============================================================
+# THEME ENDPOINTS
+# ============================================================
+
+@app.route('/api/themes', methods=['GET'])
+def api_themes_list():
+    """List all content themes"""
+    try:
+        from core.themes import ThemeManager
+        tm = ThemeManager()
+        themes = tm.list_themes()
+        return jsonify({'themes': themes, 'count': len(themes)})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/themes/<theme_id>', methods=['GET'])
+def api_theme_get(theme_id):
+    """Get a specific theme"""
+    try:
+        from core.themes import ThemeManager
+        tm = ThemeManager()
+        theme = tm.get_theme(theme_id)
+        if theme:
+            return jsonify(theme)
+        return jsonify({'error': 'Theme not found'}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/themes', methods=['POST'])
+def api_theme_create():
+    """Create a new content theme"""
+    try:
+        from core.themes import ThemeManager
+        tm = ThemeManager()
+
+        data = request.json or {}
+        name = data.get('name')
+        if not name:
+            return jsonify({'error': 'Name is required'}), 400
+
+        theme = tm.create_theme(
+            name=name,
+            description=data.get('description', ''),
+            content_prompt=data.get('content_prompt', ''),
+            visual_style=data.get('visual_style', 'hyper-realistic, cinematic 4K'),
+            video_source=data.get('video_source', 'sora'),
+            schedule_hours=data.get('schedule_hours', 6),
+            platforms=data.get('platforms'),
+            hashtags=data.get('hashtags')
+        )
+
+        return jsonify({'success': True, 'theme': theme})
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/themes/<theme_id>', methods=['PUT'])
+def api_theme_update(theme_id):
+    """Update an existing theme"""
+    try:
+        from core.themes import ThemeManager
+        tm = ThemeManager()
+
+        data = request.json or {}
+        theme = tm.update_theme(theme_id, data)
+
+        if theme:
+            return jsonify({'success': True, 'theme': theme})
+        return jsonify({'error': 'Theme not found'}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/themes/<theme_id>', methods=['DELETE'])
+def api_theme_delete(theme_id):
+    """Delete a theme"""
+    try:
+        from core.themes import ThemeManager
+        tm = ThemeManager()
+
+        if tm.delete_theme(theme_id):
+            return jsonify({'success': True, 'message': f'Theme {theme_id} deleted'})
+        return jsonify({'error': 'Theme not found'}), 404
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/themes/<theme_id>/toggle', methods=['POST'])
+def api_theme_toggle(theme_id):
+    """Enable or disable a theme"""
+    try:
+        from core.themes import ThemeManager
+        tm = ThemeManager()
+
+        theme = tm.toggle_theme(theme_id)
+        if theme:
+            status = 'enabled' if theme.get('enabled') else 'disabled'
+            return jsonify({'success': True, 'theme': theme, 'message': f'Theme {status}'})
+        return jsonify({'error': 'Theme not found'}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/themes/<theme_id>/run', methods=['POST'])
+def api_theme_run(theme_id):
+    """Run video generation for a specific theme"""
+    try:
+        from workflows.theme_runner import ThemeRunner
+
+        data = request.json or {}
+        dry_run = data.get('dry_run', False)
+        duration = int(data.get('duration', 10))
+        subject = data.get('subject')
+
+        runner = ThemeRunner(api_hub, model_router)
+        result = runner.run(
+            theme_id=theme_id,
+            dry_run=dry_run,
+            duration=duration,
+            subject=subject
+        )
+
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/themes/<theme_id>/source', methods=['POST'])
+def api_theme_set_source(theme_id):
+    """Change video source for a theme (sora, pexels, manual)"""
+    try:
+        from core.themes import ThemeManager
+        tm = ThemeManager()
+
+        data = request.json or {}
+        source = data.get('source')
+        config = data.get('config', {})
+
+        if not source:
+            return jsonify({'error': 'Source is required'}), 400
+
+        theme = tm.set_video_source(theme_id, source, config)
+        if theme:
+            return jsonify({'success': True, 'theme': theme})
+        return jsonify({'error': 'Theme not found'}), 404
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/themes/sources', methods=['GET'])
+def api_theme_sources():
+    """List available video sources"""
+    try:
+        from core.themes import ThemeManager
+        tm = ThemeManager()
+        sources = tm.get_video_sources()
+        return jsonify({'sources': sources})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# ============================================================
 # SCHEDULER ENDPOINTS
 # ============================================================
 
