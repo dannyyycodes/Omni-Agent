@@ -805,10 +805,23 @@ def api_test_pexels():
     try:
         from core.pexels_client import get_pexels_client
         from utils.video_composer import VideoComposer
+        from workflows.animal_facts import AnimalFactsWorkflow
 
         data = request.json or {}
         animal_name = data.get('animal', 'Red Panda')
-        fact_text = data.get('fact', f'Did you know that {animal_name}s are amazing creatures?')
+
+        # Generate real AI fact if not provided
+        fact_text = data.get('fact')
+        if not fact_text:
+            try:
+                init_components()
+                workflow = AnimalFactsWorkflow(api_hub, model_router)
+                animal = {'id': animal_name.lower().replace(' ', '_'), 'name': animal_name}
+                fact_text = workflow._generate_fact(animal)
+                print(f"🧠 AI generated fact: {fact_text}")
+            except Exception as e:
+                print(f"⚠️ AI fact generation failed: {e}, using fallback")
+                fact_text = f'Did you know that {animal_name}s are amazing creatures?'
         dry_run = data.get('dry_run', True)
 
         # 1. Get video from Pexels

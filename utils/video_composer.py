@@ -37,7 +37,7 @@ class VideoComposer:
         video_clip = self._convert_to_portrait(video_clip, target_width, target_height)
 
         # 3. Create white bar overlay with fact + watermark
-        bar_height = 180  # Height for text + watermark
+        bar_height = 220  # Height for text + watermark (taller for better readability)
         bar_path = self._create_white_bar(fact_text, target_width, bar_height)
 
         # 4. Composite - white bar at top
@@ -80,12 +80,15 @@ class VideoComposer:
         return clip
 
     def _create_white_bar(self, fact_text, width=1080, height=180):
-        """Create white bar with black text + subtle watermark - TikTok style"""
+        """Create white bar with black text + subtle watermark - TikTok style
+
+        Smart sizing: text and watermark scale to fill space properly
+        """
         # White background
         img = Image.new('RGB', (width, height), color=(255, 255, 255))
         draw = ImageDraw.Draw(img)
 
-        # Get font
+        # Get font path
         base_dir = os.path.dirname(os.path.dirname(__file__))
         bundled_font = os.path.join(base_dir, 'assets', 'fonts', 'Inter.ttf')
 
@@ -98,51 +101,78 @@ class VideoComposer:
         else:
             font_path = None
 
-        # Main fact text - black on white
+        # Layout: 15% top padding, 70% for fact text, 15% for watermark
+        padding_top = int(height * 0.08)
+        fact_area_height = int(height * 0.65)
+        watermark_area_start = padding_top + fact_area_height
+
+        # Watermark sizing (25-30px for 180px bar, scales with height)
+        watermark_size = max(22, int(height * 0.15))
+
+        # Main fact text - find largest font that fits
+        text_padding_x = 50  # Padding from edges
+        max_text_width = width - (text_padding_x * 2)
+
+        best_font = None
+        best_lines = []
+        best_size = 20
+
         try:
             if font_path:
-                # Try different sizes to fit
-                for size in [32, 28, 24, 22, 20]:
+                # Try sizes from large to small (bigger = better for readability)
+                for size in [52, 48, 44, 40, 36, 32, 28, 24]:
                     font = ImageFont.truetype(font_path, size)
-                    lines = self._wrap_text_to_width(draw, fact_text, font, width - 60)
+                    lines = self._wrap_text_to_width(draw, fact_text, font, max_text_width)
 
-                    line_height = size + 10
-                    total_text_height = len(lines) * line_height
+                    # Calculate total height with proper line spacing
+                    line_spacing = int(size * 1.3)
+                    total_text_height = len(lines) * line_spacing
 
-                    # Leave room for watermark (30px at bottom)
-                    if total_text_height < height - 50:
+                    # Check if it fits in the fact area
+                    if total_text_height <= fact_area_height:
+                        best_font = font
+                        best_lines = lines
+                        best_size = size
                         break
+
+                if not best_font:
+                    best_font = ImageFont.truetype(font_path, 24)
+                    best_lines = self._wrap_text_to_width(draw, fact_text, best_font, max_text_width)
+                    best_size = 24
             else:
-                font = ImageFont.load_default()
-                lines = [fact_text[:60] + "..."]
+                best_font = ImageFont.load_default()
+                best_lines = [fact_text[:80] + "..." if len(fact_text) > 80 else fact_text]
         except:
-            font = ImageFont.load_default()
-            lines = [fact_text[:60] + "..."]
+            best_font = ImageFont.load_default()
+            best_lines = [fact_text[:80] + "..." if len(fact_text) > 80 else fact_text]
 
-        # Draw fact text centered
-        line_height = 36
-        total_text_height = len(lines) * line_height
-        start_y = 20  # Padding from top
+        # Calculate vertical centering for fact text
+        line_spacing = int(best_size * 1.3)
+        total_text_height = len(best_lines) * line_spacing
+        fact_start_y = padding_top + (fact_area_height - total_text_height) // 2
 
-        for i, line in enumerate(lines):
-            bbox = draw.textbbox((0, 0), line, font=font)
+        # Draw fact text - centered horizontally and vertically
+        for i, line in enumerate(best_lines):
+            bbox = draw.textbbox((0, 0), line, font=best_font)
             text_width = bbox[2] - bbox[0]
             x = (width - text_width) // 2
-            y = start_y + (i * line_height)
-            draw.text((x, y), line, fill=(30, 30, 30), font=font)  # Dark black text
+            y = fact_start_y + (i * line_spacing)
+            draw.text((x, y), line, fill=(20, 20, 20), font=best_font)
 
-        # Draw subtle watermark at bottom
+        # Draw watermark - centered at bottom
         try:
-            watermark_font = ImageFont.truetype(font_path, 18) if font_path else ImageFont.load_default()
+            watermark_font = ImageFont.truetype(font_path, watermark_size) if font_path else ImageFont.load_default()
         except:
             watermark_font = ImageFont.load_default()
 
         watermark = "@howanimalslove"
         wm_bbox = draw.textbbox((0, 0), watermark, font=watermark_font)
         wm_width = wm_bbox[2] - wm_bbox[0]
+        wm_height = wm_bbox[3] - wm_bbox[1]
         wm_x = (width - wm_width) // 2
-        wm_y = height - 35  # Near bottom of white bar
-        draw.text((wm_x, wm_y), watermark, fill=(150, 150, 150), font=watermark_font)  # Light gray
+        # Center watermark in remaining space below fact text
+        wm_y = watermark_area_start + (height - watermark_area_start - wm_height) // 2
+        draw.text((wm_x, wm_y), watermark, fill=(140, 140, 140), font=watermark_font)
 
         bar_path = os.path.join(self.output_dir, 'white_bar.png')
         img.save(bar_path)
