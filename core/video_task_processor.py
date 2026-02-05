@@ -88,33 +88,60 @@ class VideoTaskProcessor:
                 headers=headers,
                 timeout=30
             )
-            
+
+            # Check for HTTP errors
             if resp.status_code != 200:
-                logger.warning(f"Kie.ai poll failed: {resp.status_code}")
-                raise Exception(f"Kie.ai returned {resp.status_code}")
-            
-            data = resp.json().get('data', {})
+                error_msg = f"Kie.ai returned HTTP {resp.status_code}"
+                try:
+                    error_data = resp.json()
+                    error_msg = error_data.get('message', error_data.get('error', error_msg))
+                except:
+                    pass
+                logger.error(f"Kie.ai API error for {task.task_id[:8]}: {error_msg}")
+                self._handle_task_error(task, error_msg)
+                return
+
+            # Check for error in response body
+            resp_data = resp.json()
+            if resp_data.get('code') and resp_data.get('code') != 200:
+                error_msg = resp_data.get('message', 'Unknown Kie.ai error')
+                logger.error(f"Kie.ai error for {task.task_id[:8]}: {error_msg}")
+                self._handle_task_error(task, error_msg)
+                return
+
+            data = resp_data.get('data', {})
             progress = data.get('progress', 0)
             result_json = data.get('resultJson', '')
-            
+
+            # Check for failed status in response
+            status = data.get('status', '').lower()
+            if status in ['failed', 'error', 'cancelled']:
+                error_msg = data.get('errorMessage') or data.get('error') or f"Task {status}"
+                logger.error(f"Kie.ai task failed for {task.task_id[:8]}: {error_msg}")
+                self._handle_task_error(task, error_msg)
+                return
+
             # Update task
             task.last_poll_at = datetime.utcnow()
             task.progress = progress
-            
+
             if progress > 0 and task.status == 'pending':
                 task.status = 'processing'
-            
+
             logger.info(f"📹 Task {task.task_id[:8]}... ({task.animal_name}): {progress}%")
-            
+
             # Check if completed
             if result_json:
                 self._handle_completion(task, result_json)
-            
+
             self.session.commit()
-            
+
         except requests.exceptions.RequestException as e:
             logger.warning(f"Network error polling Kie.ai: {e}")
-            raise  # Will trigger retry logic
+            self._handle_task_error(task, f"Network error: {str(e)}")
+        except Exception as e:
+            logger.error(f"Unexpected error polling Kie.ai: {e}")
+            self._handle_task_error(task, f"Error: {str(e)}")
     
     def _handle_completion(self, task, result_json):
         """Handle completed video generation"""

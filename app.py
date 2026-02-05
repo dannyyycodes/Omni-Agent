@@ -1106,9 +1106,92 @@ def api_list_tasks():
         
         session.close()
         return jsonify({'tasks': result, 'count': len(result)})
-        
+
     except Exception as e:
         return jsonify({'error': str(e), 'tasks': []}), 200
+
+
+@app.route('/api/tasks/<task_id>/cancel', methods=['POST'])
+def api_cancel_task(task_id):
+    """Cancel/fail a stuck task"""
+    try:
+        from core.memory import PendingVideoTask, HAS_SQLALCHEMY
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+
+        if not HAS_SQLALCHEMY:
+            return jsonify({'error': 'Database not available'}), 500
+
+        data = request.json or {}
+        reason = data.get('reason', 'Manually cancelled')
+
+        db_url = get_db_url()
+        engine = create_engine(db_url)
+        Session = sessionmaker(bind=engine)
+        session = Session()
+
+        task = session.query(PendingVideoTask).filter(
+            PendingVideoTask.task_id == task_id
+        ).first()
+
+        if not task:
+            session.close()
+            return jsonify({'error': 'Task not found'}), 404
+
+        task.status = 'failed'
+        task.error_message = reason
+        session.commit()
+        session.close()
+
+        return jsonify({
+            'success': True,
+            'task_id': task_id,
+            'status': 'failed',
+            'message': f'Task marked as failed: {reason}'
+        })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/tasks/failed', methods=['GET'])
+def api_get_failed_tasks():
+    """Get recent failed tasks for alerting"""
+    try:
+        from core.memory import PendingVideoTask, HAS_SQLALCHEMY
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        from datetime import datetime, timedelta
+
+        if not HAS_SQLALCHEMY:
+            return jsonify({'failed': [], 'count': 0})
+
+        db_url = get_db_url()
+        engine = create_engine(db_url)
+        Session = sessionmaker(bind=engine)
+        session = Session()
+
+        # Get failed tasks from last 24 hours
+        since = datetime.utcnow() - timedelta(hours=24)
+        tasks = session.query(PendingVideoTask).filter(
+            PendingVideoTask.status.in_(['failed', 'dead_letter']),
+            PendingVideoTask.created_at >= since
+        ).order_by(PendingVideoTask.created_at.desc()).limit(10).all()
+
+        result = []
+        for task in tasks:
+            result.append({
+                'task_id': task.task_id,
+                'animal': task.animal_name,
+                'error': task.error_message,
+                'created_at': task.created_at.isoformat() if task.created_at else None
+            })
+
+        session.close()
+        return jsonify({'failed': result, 'count': len(result)})
+
+    except Exception as e:
+        return jsonify({'error': str(e), 'failed': [], 'count': 0})
 
 
 # ============================================================
