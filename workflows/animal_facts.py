@@ -92,24 +92,64 @@ class AnimalFactsWorkflow:
         sora_prompt = self._build_sora_prompt(animal, duration=duration)
         print(f"🎨 Sora Prompt: {sora_prompt[:50]}...")
         
-        # 4. Generate Video via Kie.ai
+        # 4. Generate Video - Try Sora first, fallback to Pexels
+        video_url = None
+        video_source = "sora"
+
         kie_key = os.environ.get('KIE_API_KEY')
-        if not kie_key:
-            return {"error": "Missing KIE_API_KEY", "fact": fact, "animal": animal['name']}
-        
-        print(f"🎥 Calling Kie.ai (Sora 2) - {duration}s video...")
-        
-        # Start video generation (don't wait for completion)
-        try:
-            task_id = self._kie_generate(kie_key, sora_prompt, duration=duration)
-            print(f"✅ Video generation started: Task ID {task_id}")
-            
-            # Poll with extended timeout (Sora 2 can take 2-5 minutes)
-            print("⏳ Waiting for video generation (this may take 2-5 minutes)...")
-            video_url = self._kie_poll(kie_key, task_id, max_wait=300)  # 5 minutes
-            
-        except Exception as e:
-            return {"error": f"Video generation failed: {str(e)}", "fact": fact}
+        if kie_key:
+            print(f"🎥 Trying Sora 2 via Kie.ai - {duration}s video...")
+            try:
+                task_id = self._kie_generate(kie_key, sora_prompt, duration=duration)
+                print(f"✅ Video generation started: Task ID {task_id}")
+                print("⏳ Waiting for video generation (this may take 2-5 minutes)...")
+                video_url = self._kie_poll(kie_key, task_id, max_wait=300)
+            except Exception as e:
+                sora_error = str(e)
+                logger.warning(f"Sora failed: {sora_error}")
+                print(f"⚠️ Sora failed: {sora_error}")
+
+                # Alert about Sora failure
+                try:
+                    from core.alerter import get_alerter
+                    get_alerter().alert_service_error("Sora (Kie.ai)", sora_error[:200])
+                except:
+                    pass
+        else:
+            logger.info("No KIE_API_KEY, skipping Sora")
+
+        # Fallback to Pexels if Sora failed or unavailable
+        if not video_url:
+            print(f"🔄 Falling back to Pexels stock footage...")
+            try:
+                from core.pexels_client import get_pexels_client
+                pexels = get_pexels_client()
+
+                if pexels.is_available():
+                    pexels_result = pexels.get_animal_video(animal['name'])
+                    if pexels_result:
+                        video_url = pexels_result['video_url']
+                        video_source = "pexels"
+                        print(f"✅ Pexels video found: {video_url[:50]}...")
+
+                        # Alert about fallback
+                        try:
+                            from core.alerter import get_alerter
+                            get_alerter().send_alert(
+                                f"📹 *PEXELS FALLBACK*\n\nSora unavailable, using Pexels for {animal['name']}.\nVideo source: Stock footage",
+                                silent=True
+                            )
+                        except:
+                            pass
+                    else:
+                        logger.error(f"No Pexels video found for {animal['name']}")
+                else:
+                    logger.error("Pexels API key not configured")
+            except Exception as e:
+                logger.error(f"Pexels fallback failed: {e}")
+
+        if not video_url:
+            return {"error": "Video generation failed (Sora and Pexels both failed)", "fact": fact, "animal": animal['name']}
         
         print(f"✅ Video ready: {video_url}")
         
