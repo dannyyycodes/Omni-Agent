@@ -2,6 +2,9 @@
 import os
 import requests
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
+# Fix PIL compatibility for moviepy (ANTIALIAS removed in Pillow 10+)
+if not hasattr(Image, 'ANTIALIAS'):
+    Image.ANTIALIAS = Image.Resampling.LANCZOS
 from moviepy.editor import VideoFileClip, ImageClip, CompositeVideoClip, concatenate_videoclips
 import textwrap
 
