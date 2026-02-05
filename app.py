@@ -742,6 +742,60 @@ def api_animal_facts_list():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/animal-facts/test-overlay', methods=['POST'])
+def api_test_overlay():
+    """
+    Test the video text overlay without generating a new Sora video.
+    Uses a sample video or provided video URL.
+    """
+    try:
+        from utils.video_composer import VideoComposer
+
+        data = request.json or {}
+
+        # Use provided video URL or a sample
+        video_url = data.get('video_url', 'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4')
+        fact_text = data.get('fact', 'Did you know that peacocks can see ultraviolet light, helping them assess potential mates?')
+        animal_name = data.get('animal', 'Peacock')
+
+        composer = VideoComposer()
+        output_filename = f"test_overlay_{datetime.now().strftime('%Y%m%d_%H%M%S')}.mp4"
+
+        result_path = composer.add_fact_overlay(
+            video_url=video_url,
+            fact_text=fact_text,
+            animal_name=animal_name,
+            output_filename=output_filename
+        )
+
+        # Return the URL to access the video
+        if result_path and os.path.exists(result_path):
+            # Get relative path for serving
+            video_url = f"/static/videos/{os.path.basename(result_path)}"
+            return jsonify({
+                'status': 'success',
+                'message': 'Overlay test complete',
+                'video_url': video_url,
+                'file_path': result_path,
+                'animal': animal_name,
+                'fact': fact_text
+            })
+        else:
+            return jsonify({
+                'status': 'error',
+                'message': 'Composition returned but file not found',
+                'result': str(result_path)
+            }), 500
+
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'status': 'error',
+            'message': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
+
+
 # ============================================================
 # SCHEDULER ENDPOINTS
 # ============================================================
