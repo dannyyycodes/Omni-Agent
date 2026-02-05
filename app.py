@@ -814,14 +814,14 @@ def api_test_pexels():
         fact_text = data.get('fact')
         if not fact_text:
             try:
-                init_components()
+                init_omni()  # Ensure components are initialized
                 workflow = AnimalFactsWorkflow(api_hub, model_router)
                 animal = {'id': animal_name.lower().replace(' ', '_'), 'name': animal_name}
                 fact_text = workflow._generate_fact(animal)
                 print(f"🧠 AI generated fact: {fact_text}")
             except Exception as e:
                 print(f"⚠️ AI fact generation failed: {e}, using fallback")
-                fact_text = f'Did you know that {animal_name}s are amazing creatures?'
+                fact_text = f'Did you know that {animal_name}s are incredible creatures with fascinating behaviors?'
         dry_run = data.get('dry_run', True)
 
         # 1. Get video from Pexels
