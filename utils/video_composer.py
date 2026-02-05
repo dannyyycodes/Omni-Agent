@@ -70,26 +70,36 @@ class VideoComposer:
              img = Image.new('RGB', (width, height), color='white')
             
         draw = ImageDraw.Draw(img)
-        
-        # Fonts
-        emoji_path = 'C:/Windows/Fonts/seguiemj.ttf' 
-        bold_path = 'C:/Windows/Fonts/arialbd.ttf'
-        
-        if not os.path.exists(emoji_path):
-             if os.path.exists('C:/Windows/Fonts/seguisym.ttf'):
-                 emoji_path = 'C:/Windows/Fonts/seguisym.ttf'
-             else:
-                 emoji_path = "arial.ttf" 
-        
-        if not os.path.exists(bold_path):
-            bold_path = "arial.ttf"
+
+        # Fonts - use bundled font for cross-platform compatibility
+        base_dir = os.path.dirname(os.path.dirname(__file__))
+        bundled_font = os.path.join(base_dir, 'assets', 'fonts', 'Inter.ttf')
+
+        # Try bundled font first, then system fonts
+        if os.path.exists(bundled_font):
+            bold_path = bundled_font
+            emoji_path = bundled_font
+        elif os.path.exists('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'):
+            # Linux fallback
+            bold_path = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'
+            emoji_path = bold_path
+        elif os.path.exists('C:/Windows/Fonts/arialbd.ttf'):
+            # Windows fallback
+            bold_path = 'C:/Windows/Fonts/arialbd.ttf'
+            emoji_path = 'C:/Windows/Fonts/seguiemj.ttf' if os.path.exists('C:/Windows/Fonts/seguiemj.ttf') else bold_path
+        else:
+            bold_path = None  # Will use default
+            emoji_path = None
             
         # Draw Branding (Bottom)
         brand_y = height - 70
         try:
-            brand_font = ImageFont.truetype(emoji_path, 40)
+            if emoji_path and os.path.exists(emoji_path):
+                brand_font = ImageFont.truetype(emoji_path, 40)
+            else:
+                brand_font = ImageFont.load_default()
         except:
-             brand_font = ImageFont.load_default()
+            brand_font = ImageFont.load_default()
              
         brand_text = "@howanimalslove"
         bbox = draw.textbbox((0, 0), brand_text, font=brand_font)
@@ -120,7 +130,11 @@ class VideoComposer:
         min_size = 30
         font = ImageFont.load_default()
         lines = []
-        
+
+        # If no font path, use default
+        if not font_path or not os.path.exists(font_path):
+            return font, self._wrap_text(text, font, max_width)
+
         while size >= min_size:
             try:
                 if font_path.endswith('.ttc'):
