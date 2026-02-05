@@ -13,29 +13,101 @@ class VideoComposer:
         os.makedirs(self.output_dir, exist_ok=True)
         
     def add_fact_overlay(self, video_url, fact_text, animal_name, output_filename="final_video.mp4"):
-        # V4 Implementation
+        # V5 Implementation - Slim transparent overlay
         # 1. Download/Get Video
         video_path = self._download_video(video_url)
-        
+
         try:
              video_clip = VideoFileClip(video_path)
         except Exception as e:
             print(f"Error loading video: {e}")
             return video_path
 
-        # 3. Create Text Overlay Image
+        # 2. Create slim text overlay (120px height, semi-transparent)
         w, h = video_clip.size
-        # Fixed 400px header
-        bar_path = self._create_text_bar(fact_text, f"{animal_name} Facts", w, 400)
-        
-        # 4. Composite
+        bar_height = 120  # Much smaller - just enough for text
+        bar_path = self._create_slim_overlay(fact_text, animal_name, w, bar_height)
+
+        # 3. Composite - overlay on top of full video
         bar_clip = ImageClip(bar_path).set_duration(video_clip.duration).set_pos(('center', 'top'))
         final = CompositeVideoClip([video_clip, bar_clip], size=video_clip.size)
-        
+
         out_path = os.path.join(self.output_dir, output_filename)
         final.write_videofile(out_path, codec='libx264', audio_codec='aac', fps=30, verbose=False, logger=None)
-        
+
         return out_path
+
+    def _create_slim_overlay(self, fact_text, animal_name, width, height=120):
+        """Create a slim semi-transparent overlay with the fact text"""
+        # Create RGBA image for transparency
+        img = Image.new('RGBA', (width, height), color=(0, 0, 0, 180))  # Semi-transparent black
+        draw = ImageDraw.Draw(img)
+
+        # Get font
+        base_dir = os.path.dirname(os.path.dirname(__file__))
+        bundled_font = os.path.join(base_dir, 'assets', 'fonts', 'Inter.ttf')
+
+        if os.path.exists(bundled_font):
+            font_path = bundled_font
+        elif os.path.exists('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'):
+            font_path = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'
+        elif os.path.exists('C:/Windows/Fonts/arialbd.ttf'):
+            font_path = 'C:/Windows/Fonts/arialbd.ttf'
+        else:
+            font_path = None
+
+        # Fit text to width with appropriate font size
+        try:
+            if font_path:
+                # Start with size 28, reduce if needed
+                for size in [28, 24, 20, 18]:
+                    font = ImageFont.truetype(font_path, size)
+                    # Wrap text
+                    words = fact_text.split()
+                    lines = []
+                    current_line = ""
+                    for word in words:
+                        test = current_line + " " + word if current_line else word
+                        bbox = draw.textbbox((0, 0), test, font=font)
+                        if bbox[2] - bbox[0] < width - 40:
+                            current_line = test
+                        else:
+                            if current_line:
+                                lines.append(current_line)
+                            current_line = word
+                    if current_line:
+                        lines.append(current_line)
+
+                    # Check if fits in height (with padding)
+                    line_height = size + 8
+                    total_height = len(lines) * line_height
+                    if total_height < height - 20:
+                        break
+            else:
+                font = ImageFont.load_default()
+                lines = [fact_text[:50] + "..."]
+        except:
+            font = ImageFont.load_default()
+            lines = [fact_text[:50] + "..."]
+
+        # Draw text centered
+        line_height = 32
+        total_text_height = len(lines) * line_height
+        start_y = (height - total_text_height) // 2
+
+        for i, line in enumerate(lines):
+            bbox = draw.textbbox((0, 0), line, font=font)
+            text_width = bbox[2] - bbox[0]
+            x = (width - text_width) // 2
+            y = start_y + (i * line_height)
+            # White text with slight shadow for readability
+            draw.text((x+1, y+1), line, fill=(0, 0, 0, 150), font=font)  # Shadow
+            draw.text((x, y), line, fill=(255, 255, 255, 255), font=font)  # White text
+
+        # Save as PNG to preserve transparency
+        bar_path = os.path.join(self.output_dir, 'text_overlay.png')
+        img.save(bar_path, 'PNG')
+        return bar_path
 
     def _download_video(self, url):
         """Download video from URL to temp file, or use local file"""
