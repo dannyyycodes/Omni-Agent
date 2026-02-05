@@ -37,7 +37,8 @@ class VideoComposer:
         video_clip = self._convert_to_portrait(video_clip, target_width, target_height)
 
         # 3. Create white bar overlay with fact + watermark
-        bar_height = 220  # Height for text + watermark (taller for better readability)
+        # 250px = ~13% of 1920px height, gives room for 60px text + watermark
+        bar_height = 250
         bar_path = self._create_white_bar(fact_text, target_width, bar_height)
 
         # 4. Composite - white bar at top
@@ -106,8 +107,9 @@ class VideoComposer:
         fact_area_height = int(height * 0.65)
         watermark_area_start = padding_top + fact_area_height
 
-        # Watermark sizing (25-30px for 180px bar, scales with height)
-        watermark_size = max(22, int(height * 0.15))
+        # Watermark sizing - readable but subtle (scales with bar height)
+        # For 250px bar: 0.12 * 250 = 30px, with minimum of 26px
+        watermark_size = max(26, int(height * 0.12))
 
         # Main fact text - find largest font that fits
         text_padding_x = 50  # Padding from edges
@@ -119,8 +121,11 @@ class VideoComposer:
 
         try:
             if font_path:
-                # Try sizes from large to small (bigger = better for readability)
-                for size in [52, 48, 44, 40, 36, 32, 28, 24]:
+                # Try sizes from large to small
+                # Mobile readability: 40-48px minimum recommended for 1080p video
+                # Start large (60px) for short facts, scale down for longer ones
+                # Minimum 36px to ensure readability on all devices
+                for size in [60, 56, 52, 48, 44, 40, 36]:
                     font = ImageFont.truetype(font_path, size)
                     lines = self._wrap_text_to_width(draw, fact_text, font, max_text_width)
 
@@ -136,9 +141,15 @@ class VideoComposer:
                         break
 
                 if not best_font:
-                    best_font = ImageFont.truetype(font_path, 24)
+                    # If text still too long at 36px, use 36px and truncate if needed
+                    best_font = ImageFont.truetype(font_path, 36)
                     best_lines = self._wrap_text_to_width(draw, fact_text, best_font, max_text_width)
-                    best_size = 24
+                    # Limit to lines that fit
+                    max_lines = int(fact_area_height / (36 * 1.3))
+                    if len(best_lines) > max_lines:
+                        best_lines = best_lines[:max_lines]
+                        best_lines[-1] = best_lines[-1][:50] + "..."
+                    best_size = 36
             else:
                 best_font = ImageFont.load_default()
                 best_lines = [fact_text[:80] + "..." if len(fact_text) > 80 else fact_text]

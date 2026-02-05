@@ -176,10 +176,10 @@ class AnimalFactsWorkflow:
         
         caption = f"🐾 Did you know? {fact[:100]}... #animals #facts #wildlife #nature"
         blotato_key = os.environ.get('BLOTATO_API_KEY')
-        
+
         if blotato_key:
             try:
-                post_result = self._post_blotato(blotato_key, final_video, caption)
+                post_result = self._post_blotato(blotato_key, final_video, caption, animal['name'], fact)
                 return {
                     "status": "success",
                     "animal": animal['name'],
@@ -567,15 +567,40 @@ The tone is captivating and authentic, showcasing the {animal['name']}'s natural
             title=animal_name
         )
     
-    def _post_blotato(self, key, video_url, caption):
-        """Post to social platforms via Blotato"""
+    def _post_blotato(self, key, video_url, caption, animal_name=None, fact=None):
+        """Post to social platforms via Blotato with platform-optimized content"""
+
+        # Generate platform-specific content
+        if animal_name and fact:
+            # YouTube Shorts: needs a catchy title (under 100 chars)
+            yt_title = f"Did You Know This About {animal_name}? 🐾 #shorts"
+            if len(yt_title) > 100:
+                yt_title = f"{animal_name} Facts 🐾 #shorts"
+
+            # TikTok/Instagram: hashtag-rich caption
+            hashtags = "#animals #wildlife #nature #facts #didyouknow #animalfacts #fascinating #education #viral"
+            tiktok_caption = f"🐾 {fact[:150]}{'...' if len(fact) > 150 else ''}\n\n{hashtags}"
+
+            # Instagram: similar but with more description
+            ig_caption = f"🐾 Did you know?\n\n{fact}\n\nFollow @howanimalslove for more amazing animal facts!\n\n{hashtags}"
+        else:
+            yt_title = "Amazing Animal Facts 🐾 #shorts"
+            tiktok_caption = caption
+            ig_caption = caption
+
         resp = requests.post(
             "https://api.blotato.com/v1/posts/create",
             headers={"Authorization": f"Bearer {key}"},
             json={
                 "video_url": video_url,
-                "caption": caption,
-                "platforms": ["instagram", "tiktok", "youtube_shorts"]
+                "caption": ig_caption,  # Primary caption
+                "title": yt_title,  # YouTube title
+                "platforms": ["instagram", "tiktok", "youtube_shorts"],
+                "platform_captions": {
+                    "tiktok": tiktok_caption,
+                    "instagram": ig_caption,
+                    "youtube_shorts": f"{yt_title}\n\n{fact[:200] if fact else caption}"
+                }
             },
             timeout=60
         )

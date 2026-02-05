@@ -125,7 +125,7 @@ class AsyncWorkflowWrapper:
 
                 if blotato_key:
                     try:
-                        self.workflow._post_blotato(blotato_key, final_video, caption)
+                        self.workflow._post_blotato(blotato_key, final_video, caption, animal['name'], fact)
                         posted = True
                         logger.info("✅ Posted to social media via Pexels fallback")
                     except Exception as e:

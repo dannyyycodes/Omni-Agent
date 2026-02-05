@@ -859,7 +859,7 @@ def api_test_pexels():
                     from workflows.animal_facts import AnimalFactsWorkflow
                     workflow = AnimalFactsWorkflow(api_hub, model_router)
                     caption = f"🐾 Did you know? {fact_text[:100]}... #animals #facts #wildlife"
-                    workflow._post_blotato(blotato_key, final_video, caption)
+                    workflow._post_blotato(blotato_key, final_video, caption, animal_name, fact_text)
                     posted = True
                     print("✅ Posted to social media!")
                 except Exception as e:
