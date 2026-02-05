@@ -39,7 +39,7 @@ class PexelsClient:
         """Check if Pexels is configured"""
         return bool(self.api_key)
 
-    def search_video(self, query: str, orientation: str = "portrait", min_duration: int = 8) -> dict:
+    def search_video(self, query: str, orientation: str = "portrait", min_duration: int = 8, animal_name: str = None) -> dict:
         """
         Search for a video matching the query.
 
@@ -47,6 +47,7 @@ class PexelsClient:
             query: Search term (e.g., "elephant wildlife")
             orientation: "portrait" for shorts, "landscape" for YouTube
             min_duration: Minimum video length in seconds
+            animal_name: The specific animal we're searching for (used to prevent wrong animal fallbacks)
 
         Returns:
             dict with video_url, duration, width, height or None if not found
@@ -79,9 +80,9 @@ class PexelsClient:
             videos = data.get("videos", [])
 
             if not videos:
-                # Try broader search
+                # Try broader search with same animal
                 logger.info(f"No results for '{query}', trying broader search...")
-                return self._broader_search(query, orientation, min_duration, headers)
+                return self._broader_search(query, orientation, min_duration, headers, animal_name)
 
             # Filter by duration AND ensure it's REAL wildlife footage
             suitable_videos = []
@@ -98,7 +99,7 @@ class PexelsClient:
 
             if not suitable_videos:
                 logger.warning(f"No REAL wildlife videos found for '{query}', trying broader search...")
-                return self._broader_search(query, orientation, min_duration, headers)
+                return self._broader_search(query, orientation, min_duration, headers, animal_name)
 
             video = random.choice(suitable_videos)
 
@@ -159,19 +160,22 @@ class PexelsClient:
         # Video passed all checks
         return True
 
-    def _broader_search(self, query: str, orientation: str, min_duration: int, headers: dict) -> dict:
-        """Try broader search terms if specific search fails - still filters for REAL wildlife"""
-        # Extract main animal word and try variations with "real wildlife" focus
+    def _broader_search(self, query: str, orientation: str, min_duration: int, headers: dict, animal_name: str = None) -> dict:
+        """
+        Try broader search terms if specific search fails.
+        CRITICAL: Only searches for the SAME animal - NEVER returns a different animal.
+        """
+        # Extract main animal word
         words = query.lower().split()
-        animal_word = words[0] if words else query
+        animal_word = animal_name.lower() if animal_name else (words[0] if words else query)
 
+        # ONLY search for this specific animal - never generic wildlife
         broader_terms = [
-            f"{animal_word} wild nature",
-            f"{animal_word} wildlife documentary",
-            f"{animal_word} in nature",
-            "wildlife documentary",
-            "wild animals nature",
-            "safari wildlife"
+            f"{animal_word}",
+            f"{animal_word} animal",
+            f"{animal_word} wild",
+            f"{animal_word} nature",
+            f"{animal_word} close up",
         ]
 
         for term in broader_terms:
@@ -244,53 +248,41 @@ class PexelsClient:
         # Fallback to first available
         return sorted_files[0] if sorted_files else None
 
-    def get_animal_video(self, animal_name: str, fallback_to_other_animal: bool = True) -> dict:
+    def get_animal_video(self, animal_name: str) -> dict:
         """
         Get a REAL wildlife video for a specific animal.
-        Only returns actual nature footage - no puppets, cartoons, or fake content.
+
+        CRITICAL: Only returns video of the REQUESTED animal - NEVER a different animal.
+        If no video found for this animal, returns None (workflow should pick different animal).
 
         Args:
             animal_name: Name of the animal to search for
-            fallback_to_other_animal: If True, will try generic wildlife if animal not found
 
         Returns:
-            dict with video info or None if no REAL wildlife found
+            dict with video info or None if no video found for THIS SPECIFIC animal
         """
-        logger.info(f"Searching for REAL {animal_name} wildlife footage...")
+        logger.info(f"Searching for REAL {animal_name} wildlife footage (strict match)...")
 
-        # Search terms optimized for REAL wildlife (not toys/puppets/cartoons)
+        # Search terms - all MUST include the animal name
         search_terms = [
-            f"{animal_name} wild nature",
-            f"{animal_name} wildlife documentary",
-            f"{animal_name} in habitat",
+            f"{animal_name}",
+            f"{animal_name} animal",
+            f"{animal_name} wildlife",
+            f"{animal_name} wild",
+            f"{animal_name} nature",
+            f"{animal_name} zoo",
             f"wild {animal_name}",
-            f"{animal_name} safari",
-            f"{animal_name} zoo",  # Zoo footage is still real
         ]
 
         for term in search_terms:
-            result = self.search_video(term, orientation="portrait", min_duration=8)
+            result = self.search_video(term, orientation="portrait", min_duration=8, animal_name=animal_name)
             if result:
                 logger.info(f"Found REAL wildlife video for {animal_name}")
                 return result
 
-        # If specific animal not found and fallback enabled, try generic wildlife
-        if fallback_to_other_animal:
-            logger.warning(f"No real footage for {animal_name}, trying generic wildlife...")
-            generic_terms = [
-                "wildlife documentary nature",
-                "wild animals safari",
-                "nature documentary animals",
-                "rainforest wildlife",
-                "ocean wildlife"
-            ]
-            for term in generic_terms:
-                result = self.search_video(term, orientation="portrait", min_duration=8)
-                if result:
-                    logger.info(f"Using generic wildlife footage instead of {animal_name}")
-                    return result
-
-        logger.warning(f"No REAL Pexels video found for {animal_name}")
+        # NO FALLBACK - if we can't find this animal, return None
+        # The workflow must choose a different animal
+        logger.warning(f"No Pexels video found for {animal_name} - workflow should try different animal")
         return None
 
 

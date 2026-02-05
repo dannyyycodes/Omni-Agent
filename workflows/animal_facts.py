@@ -24,6 +24,15 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 class AnimalFactsWorkflow:
+    # Animals with reliable Pexels portrait video coverage
+    PEXELS_SAFE_ANIMALS = [
+        'Lion', 'Elephant', 'Giraffe', 'Zebra', 'Tiger',
+        'Eagle', 'Horse', 'Dog', 'Cat', 'Owl',
+        'Dolphin', 'Fish', 'Butterfly', 'Deer', 'Bear',
+        'Fox', 'Wolf', 'Rabbit', 'Squirrel', 'Parrot',
+        'Penguin', 'Flamingo', 'Hummingbird', 'Koala', 'Panda'
+    ]
+
     def __init__(self, api_hub, model_router):
         self.api_hub = api_hub
         self.model_router = model_router
@@ -126,11 +135,38 @@ class AnimalFactsWorkflow:
                 pexels = get_pexels_client()
 
                 if pexels.is_available():
+                    # Try original animal first
                     pexels_result = pexels.get_animal_video(animal['name'])
+
+                    # If no video for this animal, try animals with known Pexels coverage
+                    if not pexels_result:
+                        print(f"⚠️ No Pexels video for {animal['name']}, trying animals with reliable coverage...")
+
+                        # Shuffle the safe animals list and try each
+                        import random
+                        safe_animals = self.PEXELS_SAFE_ANIMALS.copy()
+                        random.shuffle(safe_animals)
+
+                        for safe_animal in safe_animals[:5]:  # Try up to 5 safe animals
+                            if safe_animal.lower() != animal['name'].lower():
+                                print(f"🔄 Trying: {safe_animal}")
+                                pexels_result = pexels.get_animal_video(safe_animal)
+                                if pexels_result:
+                                    # Switch to this animal and regenerate fact
+                                    animal = {
+                                        'id': safe_animal.lower().replace(' ', '_'),
+                                        'name': safe_animal,
+                                        'prompt_style': 'in its natural habitat'
+                                    }
+                                    print(f"✅ Found video for {animal['name']}, regenerating fact...")
+                                    fact = self._generate_fact(animal)
+                                    print(f"📝 New fact: {fact[:60]}...")
+                                    break
+
                     if pexels_result:
                         video_url = pexels_result['video_url']
                         video_source = "pexels"
-                        print(f"✅ Pexels video found: {video_url[:50]}...")
+                        print(f"✅ Pexels video found for {animal['name']}: {video_url[:50]}...")
 
                         # Alert about fallback
                         try:
@@ -142,7 +178,7 @@ class AnimalFactsWorkflow:
                         except:
                             pass
                     else:
-                        logger.error(f"No Pexels video found for {animal['name']}")
+                        logger.error(f"No Pexels video found after {max_attempts} animal attempts")
                 else:
                     logger.error("Pexels API key not configured")
             except Exception as e:
