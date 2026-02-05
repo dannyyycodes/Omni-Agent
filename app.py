@@ -890,6 +890,48 @@ def api_test_pexels():
         }), 500
 
 
+@app.route('/api/animal-facts/search-pexels', methods=['POST'])
+def api_search_pexels():
+    """
+    Quick test - just search Pexels for a video URL (no processing).
+    Returns the video URL that would be used.
+    """
+    try:
+        from core.pexels_client import get_pexels_client
+
+        data = request.json or {}
+        animal_name = data.get('animal', 'Red Panda')
+
+        pexels = get_pexels_client()
+        if not pexels.is_available():
+            return jsonify({'error': 'PEXELS_API_KEY not configured'}), 500
+
+        pexels_result = pexels.get_animal_video(animal_name)
+        if not pexels_result:
+            return jsonify({
+                'status': 'not_found',
+                'animal': animal_name,
+                'message': f'No REAL wildlife video found for {animal_name}'
+            }), 404
+
+        return jsonify({
+            'status': 'success',
+            'animal': animal_name,
+            'video_url': pexels_result['video_url'],
+            'duration': pexels_result.get('duration'),
+            'pexels_id': pexels_result.get('id'),
+            'message': 'Found REAL wildlife footage'
+        })
+
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'status': 'error',
+            'message': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
+
+
 # ============================================================
 # THEME ENDPOINTS
 # ============================================================
