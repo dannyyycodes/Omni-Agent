@@ -98,6 +98,15 @@ class VideoTaskProcessor:
                 except:
                     pass
                 logger.error(f"Kie.ai API error for {task.task_id[:8]}: {error_msg}")
+
+                # Alert for server errors (500s indicate service issues)
+                if resp.status_code >= 500:
+                    try:
+                        from core.alerter import get_alerter
+                        get_alerter().alert_service_error("Kie.ai (Sora)", error_msg)
+                    except:
+                        pass
+
                 self._handle_task_error(task, error_msg)
                 return
 
@@ -208,17 +217,28 @@ class VideoTaskProcessor:
         task.error_message = error_msg
         task.retry_count += 1
         task.updated_at = datetime.utcnow()
-        
+
         if task.retry_count >= self.MAX_RETRIES:
             logger.error(f"Task {task.task_id[:8]}... failed after {task.retry_count} retries")
             task.status = 'dead_letter'
+
+            # Send alert for final failure
+            try:
+                from core.alerter import get_alerter
+                get_alerter().alert_task_failed(
+                    animal=task.animal_name,
+                    error=error_msg,
+                    task_id=task.task_id
+                )
+            except Exception as e:
+                logger.error(f"Failed to send alert: {e}")
         else:
             # Schedule retry with exponential backoff
             delay_seconds = self.RETRY_DELAYS[min(task.retry_count - 1, len(self.RETRY_DELAYS) - 1)]
             task.next_retry_at = datetime.utcnow() + timedelta(seconds=delay_seconds)
             task.status = 'failed'
             logger.info(f"Task {task.task_id[:8]}... will retry in {delay_seconds}s (attempt {task.retry_count}/{self.MAX_RETRIES})")
-        
+
         self.session.commit()
     
     def _check_timeouts(self):
@@ -229,16 +249,27 @@ class VideoTaskProcessor:
                 PendingVideoTask.status.in_(['pending', 'processing', 'failed']),
                 PendingVideoTask.created_at < cutoff_time
             ).all()
-            
+
             for task in timed_out_tasks:
                 logger.warning(f"Task {task.task_id[:8]}... timed out")
                 task.status = 'dead_letter'
                 task.error_message = f"Timed out after {self.MAX_TASK_AGE_MINUTES} minutes"
                 task.updated_at = datetime.utcnow()
-            
+
+                # Send timeout alert
+                try:
+                    from core.alerter import get_alerter
+                    get_alerter().alert_task_stuck(
+                        animal=task.animal_name,
+                        minutes=self.MAX_TASK_AGE_MINUTES,
+                        task_id=task.task_id
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to send timeout alert: {e}")
+
             if timed_out_tasks:
                 self.session.commit()
-                
+
         except Exception as e:
             logger.error(f"Error checking timeouts: {e}")
 
