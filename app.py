@@ -900,6 +900,36 @@ def api_list_videos():
     return jsonify({'videos': files[:20], 'dir': video_dir, 'count': len(files)})
 
 
+@app.route('/api/debug/all-tasks', methods=['GET'])
+def api_all_tasks():
+    """List ALL video tasks in the database"""
+    try:
+        from core.memory import PendingVideoTask, HAS_SQLALCHEMY
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        db_url = os.environ.get('DATABASE_URL', 'sqlite:///omni.db')
+        if db_url.startswith('postgres://'):
+            db_url = db_url.replace('postgres://', 'postgresql://', 1)
+        engine = create_engine(db_url)
+        Session = sessionmaker(bind=engine)
+        session = Session()
+        tasks = session.query(PendingVideoTask).order_by(PendingVideoTask.created_at.desc()).limit(20).all()
+        return jsonify({
+            'count': len(tasks),
+            'tasks': [{
+                'task_id': t.task_id[:12],
+                'animal': t.animal_name,
+                'status': t.status,
+                'video_url': (t.video_url or '')[:60],
+                'error': t.error_message,
+                'created': str(t.created_at)
+            } for t in tasks]
+        })
+    except Exception as e:
+        import traceback
+        return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
+
+
 @app.route('/api/debug/task-status/<task_id>', methods=['GET'])
 def api_task_status(task_id):
     """Check the DB status of a video task"""
