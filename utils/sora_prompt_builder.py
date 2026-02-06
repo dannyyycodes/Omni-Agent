@@ -1,163 +1,165 @@
 """
-Improved Sora Prompt Builder with AI-Powered Habitat Matching
-This ensures animals are always in their correct natural environment
+Sora 2 Prompt Builder - Optimized for HYPER-REALISM and zero hallucinations.
+
+Key principles:
+1. SHORT, clear prompts (under 150 words) - Sora hallucinates more with long prompts
+2. Natural language paragraphs - no section headings or bullet points
+3. Describe what you WANT, never what you don't want (negative prompts cause hallucinations)
+4. ONE subject, ONE simple action, ONE environment
+5. Ground everything in real-world references (BBC Earth, National Geographic)
+6. Simple actions = less hallucination. Complex actions = more hallucination.
 """
 
 import json
+import re
 import random
+
 
 def build_hyper_realistic_sora_prompt(animal_name, model_router, duration=10):
     """
-    Build HYPER-REALISTIC Sora 2 prompt with AI-powered habitat matching.
-    Ensures animals are in their correct natural environment with documentary-quality realism.
-    
-    Args:
-        animal_name: Name of the animal (e.g., "Mantis Shrimp", "Peacock")
-        model_router: ModelRouter instance for AI calls
-        duration: Video duration in seconds
-    
-    Returns:
-        str: Detailed Sora prompt optimized for hyper-realistic output
+    Build a concise, hyper-realistic Sora 2 prompt.
+    Optimized for zero hallucinations and documentary-grade realism.
     """
-    
-    # Use AI to determine the correct natural habitat and scene
-    habitat_prompt = f"""For a {animal_name}, determine its NATURAL HABITAT and create a realistic scene.
 
-Requirements:
-- Identify the animal's actual natural environment (ocean, forest, savanna, arctic, etc.)
-- Describe a specific, realistic scene in that habitat
-- Include appropriate time of day and weather
-- Ensure the environment matches the animal's biology
+    # Step 1: Get AI to describe a simple, specific scene
+    scene_data = _get_scene_from_ai(animal_name, model_router)
 
-Return ONLY a JSON object:
-{{
-    "habitat_type": "coral reef" or "tropical rainforest" or "african savanna" etc,
-    "specific_scene": "swimming among vibrant coral formations with tropical fish",
-    "time_of_day": "midday" or "golden hour" or "dawn" etc,
-    "weather": "clear sunny day" or "light rain" etc,
-    "key_details": "crystal clear water, colorful coral, gentle current"
-}}"""
+    # Step 2: Pick camera style
+    camera = random.choice([
+        "Telephoto lens, shallow depth of field, locked tripod with subtle natural sway",
+        "50mm lens at eye level, smooth slow tracking shot, cinematic bokeh background",
+        "Wide angle establishing shot, slight low angle, steady gimbal movement",
+    ])
 
-    try:
-        habitat_result = model_router.complete(
-            habitat_prompt,
-            system="You are a wildlife biologist. Return only valid JSON.",
-            max_tokens=200
-        )
-        
-        import re
-        match = re.search(r'\{.*\}', habitat_result, re.DOTALL)
-        if match:
-            habitat_data = json.loads(match.group())
-        else:
-            raise ValueError("No JSON found")
-            
-    except Exception as e:
-        print(f"Habitat AI failed: {e}, using intelligent fallback")
-        # Intelligent fallbacks based on animal name
-        animal_lower = animal_name.lower()
-        
-        # Aquatic animals
-        if any(word in animal_lower for word in ['fish', 'shark', 'whale', 'dolphin', 'octopus', 'squid', 'shrimp', 'crab', 'seal', 'otter', 'jellyfish']):
-            habitat_data = {
-                "habitat_type": "coral reef" if "shrimp" in animal_lower or "fish" in animal_lower else "ocean",
-                "specific_scene": "swimming gracefully through crystal clear water with vibrant coral and tropical fish nearby",
-                "time_of_day": "midday",
-                "weather": "clear sunny day with sunlight filtering through water",
-                "key_details": "colorful coral formations, schools of small fish, gentle water current, sunbeams penetrating the water"
-            }
-        # Birds
-        elif any(word in animal_lower for word in ['bird', 'eagle', 'hawk', 'owl', 'parrot', 'peacock', 'flamingo', 'hummingbird', 'toucan']):
-            habitat_data = {
-                "habitat_type": "tropical forest" if "peacock" in animal_lower or "parrot" in animal_lower else "woodland",
-                "specific_scene": "perched on a natural branch surrounded by lush green foliage",
-                "time_of_day": "golden hour",
-                "weather": "clear warm day",
-                "key_details": "dense tropical vegetation, dappled sunlight through leaves, natural perch, vibrant colors"
-            }
-        # Arctic animals
-        elif any(word in animal_lower for word in ['polar', 'arctic', 'penguin', 'walrus']):
-            habitat_data = {
-                "habitat_type": "arctic ice",
-                "specific_scene": "standing on pristine white ice with blue sky and distant icebergs",
-                "time_of_day": "bright daylight",
-                "weather": "clear cold day",
-                "key_details": "crystalline ice formations, distant mountains, crisp arctic air, reflective ice surface"
-            }
-        # Savanna/grassland animals
-        elif any(word in animal_lower for word in ['lion', 'elephant', 'giraffe', 'zebra', 'cheetah']):
-            habitat_data = {
-                "habitat_type": "african savanna",
-                "specific_scene": "walking through golden grassland with acacia trees in the distance",
-                "time_of_day": "golden hour",
-                "weather": "clear warm day",
-                "key_details": "tall golden grass swaying in breeze, scattered acacia trees, warm sunlight, distant horizon"
-            }
-        else:
-            # Default to temperate forest/grassland
-            habitat_data = {
-                "habitat_type": "temperate grassland",
-                "specific_scene": "moving through tall grass in a natural meadow",
-                "time_of_day": "golden hour",
-                "weather": "clear day with gentle breeze",
-                "key_details": "tall grass, wildflowers, soft natural lighting, peaceful atmosphere"
-            }
-    
-    # Camera setups for documentary realism
-    camera_setups = [
-        {
-            "position": "eye level, 6 feet distance",
-            "movement": "slow gentle tracking shot following subject",
-            "lens": "telephoto 200mm, shallow depth of field",
-            "style": "BBC Earth documentary"
-        },
-        {
-            "position": "low angle, 4 feet from subject",
-            "movement": "locked tripod with natural micro-movements",
-            "lens": "50mm prime, cinematic bokeh",
-            "style": "Planet Earth intimate wildlife moment"
-        },
-        {
-            "position": "slightly elevated, 8 feet back",
-            "movement": "smooth gimbal pan revealing environment",
-            "lens": "wide angle 24mm capturing full scene",
-            "style": "National Geographic establishing shot"
-        }
-    ]
-    
-    camera = random.choice(camera_setups)
-    
-    # Build HYPER-REALISTIC prompt
-    prompt = f"""HYPER-REALISTIC WILDLIFE DOCUMENTARY: A {animal_name} in its natural {habitat_data['habitat_type']} habitat. {habitat_data['specific_scene']}. Filmed during {habitat_data['time_of_day']}, {habitat_data['weather']}.
-
-CAMERA: {camera['position']}, {camera['lens']}, {camera['movement']}. Shot on RED camera with {camera['style']} cinematography. Crystal clear 8K resolution, perfect focus on subject.
-
-ANIMAL REALISM: The {animal_name} is ANATOMICALLY PERFECT - scientifically accurate proportions, realistic texture (fur/feathers/scales) with individual detail, natural species-accurate coloration. Eyes are lifelike with environmental reflections. Every movement follows real physics and authentic behavior.
-
-ENVIRONMENT: {habitat_data['key_details']}. PHOTOREALISTIC with accurate lighting, proper shadows, realistic textures. {habitat_data['weather']}. No artificial elements, no fantasy, NO HALLUCINATIONS.
-
-ACTION: Over {duration} seconds, the {animal_name} {habitat_data['specific_scene']} with natural, fluid movements. Scientifically accurate behavior. Proper weight, balance, biomechanics. Realistic physics throughout.
-
-LIGHTING: Natural {habitat_data['time_of_day']} lighting - accurate sun position, realistic shadows, proper color temperature. Light interacts correctly with all surfaces.
-
-AUDIO: Natural ambient sounds ONLY - gentle wind, water sounds, distant nature ambience. Subtle, awe-inspiring background music is acceptable. ABSOLUTELY NO VOICEOVER. NO NARRATION. NO HUMAN SPEECH. NO TALKING. The video must be silent except for natural environmental sounds and optional subtle music.
-
-QUALITY: Documentary-grade footage for BBC Earth/National Geographic. NO glitches, NO morphing, NO impossible physics. Every frame is believable and could be mistaken for real wildlife footage.
-
-CRITICAL: The {animal_name} MUST stay in its correct {habitat_data['habitat_type']} throughout. NO snow for tropical animals, NO desert for aquatic animals. SCIENTIFICALLY ACCURATE and VISUALLY BELIEVABLE. NO VOICEOVER OR NARRATION WHATSOEVER."""
+    # Step 3: Build the prompt - CONCISE natural language, no headings
+    prompt = (
+        f"A single {animal_name} in {scene_data['habitat']}. "
+        f"{scene_data['action']}. "
+        f"{scene_data['environment']}. "
+        f"Filmed with a {camera}. "
+        f"The animal has anatomically correct proportions, realistic {scene_data['texture']} with fine detail, "
+        f"and natural species-accurate coloring. "
+        f"Every movement is physically grounded with real weight, momentum, and gravity. "
+        f"{scene_data['lighting']}. "
+        f"Shot in 9:16 vertical format. "
+        f"Photorealistic BBC Earth wildlife documentary footage, indistinguishable from real film. "
+        f"One continuous {duration}-second shot, single subject, consistent scene throughout."
+    )
 
     return prompt
 
 
-# Example usage:
-if __name__ == "__main__":
-    # Test with different animals
-    test_animals = ["Mantis Shrimp", "Peacock", "Polar Bear", "Lion"]
-    
-    for animal in test_animals:
-        print(f"\n{'='*60}")
-        print(f"ANIMAL: {animal}")
-        print(f"{'='*60}")
-        # Would need actual model_router here
-        # prompt = build_hyper_realistic_sora_prompt(animal, model_router, 10)
-        # print(prompt)
+def _get_scene_from_ai(animal_name, model_router):
+    """Use AI to generate a simple, grounded scene description."""
+
+    scene_prompt = f"""For a wildlife documentary shot of a {animal_name}, give me a simple, realistic scene.
+
+Return ONLY this JSON:
+{{
+    "habitat": "its natural [specific habitat type]",
+    "action": "One simple sentence describing ONE calm, natural behavior the animal is doing",
+    "environment": "One sentence describing the immediate surroundings with 2-3 specific real details",
+    "texture": "fur/feathers/scales/skin - whatever is correct for this species",
+    "lighting": "One sentence about natural lighting conditions"
+}}
+
+RULES:
+- The action must be SIMPLE: standing, walking, eating, resting, looking around. Nothing complex.
+- Use specific real-world details, not vague descriptions.
+- The habitat MUST be scientifically correct for this species.
+- Keep each field to ONE short sentence maximum."""
+
+    try:
+        result = model_router.complete(
+            scene_prompt,
+            system="You are a wildlife cinematographer. Return only valid JSON, nothing else.",
+            max_tokens=200
+        )
+
+        match = re.search(r'\{.*\}', result, re.DOTALL)
+        if match:
+            data = json.loads(match.group())
+            # Validate required fields
+            required = ['habitat', 'action', 'environment', 'texture', 'lighting']
+            if all(k in data for k in required):
+                return data
+
+        raise ValueError("Invalid JSON structure")
+
+    except Exception as e:
+        print(f"Scene AI failed: {e}, using fallback")
+        return _get_fallback_scene(animal_name)
+
+
+def _get_fallback_scene(animal_name):
+    """Reliable fallback scenes for when AI fails."""
+    animal_lower = animal_name.lower()
+
+    # Aquatic
+    if any(w in animal_lower for w in ['fish', 'shark', 'whale', 'dolphin', 'octopus', 'shrimp', 'crab', 'seal', 'jellyfish', 'turtle']):
+        return {
+            "habitat": "a clear tropical ocean with a coral reef",
+            "action": f"The {animal_name} glides slowly through the water",
+            "environment": "Sunlight filters through the surface, illuminating colorful coral and small fish nearby",
+            "texture": "skin",
+            "lighting": "Bright midday sun with light rays penetrating the clear blue water"
+        }
+
+    # Birds
+    if any(w in animal_lower for w in ['bird', 'eagle', 'hawk', 'owl', 'parrot', 'peacock', 'flamingo', 'hummingbird', 'toucan', 'penguin']):
+        return {
+            "habitat": "a lush green forest",
+            "action": f"The {animal_name} perches calmly on a thick branch, turning its head slowly",
+            "environment": "Dense green foliage surrounds the scene with dappled golden sunlight filtering through leaves",
+            "texture": "feathers",
+            "lighting": "Warm golden hour sunlight with soft shadows and natural rim lighting on the feathers"
+        }
+
+    # Arctic
+    if any(w in animal_lower for w in ['polar', 'arctic', 'walrus', 'snow leopard']):
+        return {
+            "habitat": "a vast snowy arctic landscape",
+            "action": f"The {animal_name} walks steadily across the pristine white snow",
+            "environment": "Clean white snow stretches to the horizon under a pale blue sky with distant mountains",
+            "texture": "thick fur",
+            "lighting": "Bright overcast sky with even, diffused light reflecting off the snow"
+        }
+
+    # Desert
+    if any(w in animal_lower for w in ['fennec', 'camel', 'scorpion', 'meerkat', 'desert']):
+        return {
+            "habitat": "a warm sandy desert with scattered rocks",
+            "action": f"The {animal_name} stands alert on the warm sand, ears perked, scanning its surroundings",
+            "environment": "Golden sand dunes stretch behind it with a few dry desert shrubs and a clear blue sky",
+            "texture": "soft fur",
+            "lighting": "Warm late afternoon sun casting long golden shadows across the sand"
+        }
+
+    # Savanna
+    if any(w in animal_lower for w in ['lion', 'elephant', 'giraffe', 'zebra', 'cheetah', 'rhino', 'hippo', 'hyena', 'wildebeest']):
+        return {
+            "habitat": "the golden African savanna",
+            "action": f"The {animal_name} walks slowly through tall golden grass",
+            "environment": "Scattered acacia trees dot the warm grassland under a wide open sky",
+            "texture": "fur",
+            "lighting": "Golden hour sunlight with warm tones and soft directional shadows"
+        }
+
+    # Rainforest
+    if any(w in animal_lower for w in ['gorilla', 'monkey', 'sloth', 'jaguar', 'chameleon', 'frog', 'macaw']):
+        return {
+            "habitat": "a dense tropical rainforest",
+            "action": f"The {animal_name} rests calmly among the lush vegetation",
+            "environment": "Thick green leaves, hanging vines, and moss-covered branches surround the scene",
+            "texture": "fur",
+            "lighting": "Soft diffused light filtering through the dense canopy above"
+        }
+
+    # Default - temperate forest
+    return {
+        "habitat": "a peaceful temperate forest clearing",
+        "action": f"The {animal_name} stands calmly in a grassy clearing, looking directly at the camera",
+        "environment": "Green trees frame the scene with soft grass underfoot and a clear sky visible above",
+        "texture": "fur",
+        "lighting": "Natural golden hour lighting with warm tones and gentle shadows"
+    }

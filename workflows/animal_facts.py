@@ -332,101 +332,17 @@ The prompt_style should describe a cinematic action the animal does."""
             logger.info(f"✅ Generated hyper-realistic Sora prompt for {animal['name']}")
             return prompt
         except Exception as e:
-            logger.error(f"Prompt generation failed: {e}, using fallback")
-            # Simple fallback if the new system fails
-            return f"""HYPER-REALISTIC WILDLIFE DOCUMENTARY: A {animal['name']} in its natural habitat. 
-            
-Shot on RED camera with BBC Earth documentary cinematography. The {animal['name']} is anatomically perfect with realistic texture and natural coloration. Crystal clear 8K resolution.
-            
-The animal moves naturally over {duration} seconds with scientifically accurate behavior. Environment is photorealistic with proper lighting and shadows. 
-            
-Documentary-grade footage suitable for National Geographic. NO glitches, NO morphing, NO impossible physics. Every frame is believable."""
-        """
-        Build production-grade Sora 2 prompt matching n8n workflow quality.
-        Follows the same structure: Scene Setup, Camera, Action, Physical Realism, Lighting, Audio, Tone.
-        """
-        
-        # Camera variations for natural diversity
-        camera_setups = [
-            {
-                "position": "low angle, 3 feet from subject",
-                "movement": "handheld with subtle breathing sway",
-                "lens": "50mm equivalent on smartphone",
-                "style": "intimate wildlife portrait"
-            },
-            {
-                "position": "eye level, 6 feet back",
-                "movement": "slow gentle pan following the subject",
-                "lens": "telephoto zoom, shallow depth of field",
-                "style": "BBC Earth documentary style"
-            },
-            {
-                "position": "slightly elevated, 4 feet distance",
-                "movement": "locked tripod with micro-shake from wind",
-                "lens": "wide angle capturing environment",
-                "style": "National Geographic establishing shot"
-            },
-            {
-                "position": "ground level, 2 feet from subject",
-                "movement": "static with natural camera breathing",
-                "lens": "macro close-up, creamy bokeh background",
-                "style": "Planet Earth intimate moment"
-            }
-        ]
-        
-        # Lighting variations for time-of-day diversity
-        lighting_setups = [
-            "golden hour backlight with warm rim glow on fur, soft shadows stretching across terrain",
-            "overcast diffused light creating even illumination, subtle highlights on eyes and wet nose",
-            "early morning side light cutting through mist, dramatic contrast on textured fur",
-            "late afternoon warm sunlight filtering through trees, dappled light patterns on ground",
-            "midday bright natural light with crisp shadows, vibrant colors in full saturation"
-        ]
-        
-        # Environment details for grounded realism
-        environments = {
-            "snow": "pristine white snow with realistic compression under paws, distant mountain peaks sharp against blue sky, scattered rocks with snow accumulation",
-            "grass": "tall golden grass swaying gently in breeze, scattered wildflowers, distant tree line with atmospheric haze",
-            "water": "crystal clear water with visible ripples and reflections, smooth stones on riverbed, gentle current creating natural movement",
-            "forest": "dense foliage with filtered sunlight, moss-covered fallen logs, leaf litter on forest floor with natural texture",
-            "desert": "warm sand with wind-carved patterns, sparse vegetation, heat shimmer visible in distance",
-            "ice": "translucent blue ice with natural cracks and texture, frozen water droplets, reflective surface catching light"
-        }
-        
-        # Select variations
-        camera = random.choice(camera_setups)
-        lighting = random.choice(lighting_setups)
-        
-        # Determine environment from animal's prompt_style
-        action = animal.get('prompt_style', 'in its natural habitat')
-        env_key = "grass"  # default
-        if "snow" in action.lower() or "ice" in action.lower():
-            env_key = "snow"
-        elif "water" in action.lower() or "swim" in action.lower():
-            env_key = "water"
-        elif "forest" in action.lower() or "tree" in action.lower():
-            env_key = "forest"
-        elif "desert" in action.lower() or "sand" in action.lower():
-            env_key = "desert"
-        
-        environment = environments.get(env_key, environments["grass"])
-        
-        # Build the prompt as natural paragraphs (no headings, no lists)
-        prompt = f"""A {animal['name']} {action} filmed in one continuous unbroken shot. The camera is positioned at {camera['position']}, using a {camera['lens']}, capturing the scene with {camera['movement']}. This is {camera['style']}, filmed as if on a modern smartphone held by a wildlife photographer in the field.
-
-The {animal['name']} is anatomically perfect with correct proportions, realistic fur texture showing individual hairs catching light, natural muscle definition visible beneath the coat, and lifelike eyes with clear reflections of the environment. Every movement obeys real-world physics: weight shifts naturally, paws compress snow/grass/ground with appropriate pressure, tail movement follows natural momentum and balance, breathing is visible in chest expansion, and ears rotate naturally tracking sounds.
-
-The action unfolds naturally over {duration} seconds. The {animal['name']} {action}, with each micro-movement showing authentic animal behavior - head tilts, ear flicks, weight distribution, balance adjustments. If moving, the gait is biomechanically accurate with proper leg coordination and natural rhythm. Fur moves realistically with motion and wind, showing proper weight and flow.
-
-The environment is {environment}. Everything remains physically grounded and safe - no impossible movements, no morphing, no teleporting, no sudden changes in size or appearance. The {animal['name']} stays clearly visible and in focus throughout, with consistent lighting and shadows from the main light source.
-
-Lighting is {lighting}. Shadows are consistent with the light direction, creating natural depth and dimension. The {animal['name']}'s fur shows realistic light interaction with subsurface scattering on ears and translucent areas, specular highlights on wet nose and eyes, and proper shadow casting on the ground.
-
-Natural ambient audio fills the scene: gentle wind rustling through vegetation, distant bird calls appropriate to the habitat, the {animal['name']}'s breathing and natural vocalizations (realistic animal sounds, not human-like), subtle environmental sounds like water trickling or leaves crunching underfoot. No music, no narration, no voiceover.
-
-The tone is captivating and authentic, showcasing the {animal['name']}'s natural beauty and behavior in a moment that feels spontaneous yet perfectly framed. This is hyper-realistic wildlife footage indistinguishable from actual BBC Earth or National Geographic content - pure photorealism with zero CGI, animation, or stylization. Shot in 9:16 vertical format optimized for mobile viewing, maintaining razor-sharp focus on the subject with cinematic depth of field."""
-
-        return prompt
+            logger.error(f"Prompt generation failed: {e}, using concise fallback")
+            return (
+                f"A single {animal['name']} in its natural habitat. "
+                f"The animal stands calmly, looking around with natural behavior. "
+                f"Anatomically correct proportions, realistic fur with fine detail, natural coloring. "
+                f"Every movement is physically grounded with real weight and gravity. "
+                f"Golden hour lighting with warm tones and soft shadows. "
+                f"Shot in 9:16 vertical format. "
+                f"Photorealistic BBC Earth wildlife documentary footage, indistinguishable from real film. "
+                f"One continuous {duration}-second shot, single subject, consistent scene throughout."
+            )
     
     def _kie_generate(self, key, prompt, duration=10, max_retries=3):
         """Generate video via Kie.ai with retry logic and error handling"""
