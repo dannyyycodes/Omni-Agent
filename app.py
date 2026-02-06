@@ -904,6 +904,8 @@ def api_list_videos():
 def api_test_compose_upload():
     """Test compose + upload pipeline WITHOUT posting to Blotato.
     Takes a video_url, composes with fact overlay, uploads to 0x0.st, returns the hosted URL."""
+    import traceback as tb
+    steps = {}
     try:
         data = request.json or {}
         video_url = data.get('video_url')
@@ -913,24 +915,58 @@ def api_test_compose_upload():
         if not video_url:
             return jsonify({'error': 'video_url required'}), 400
 
-        from core.async_workflow_wrapper import AsyncWorkflowWrapper
-        wrapper = AsyncWorkflowWrapper(None)
-        composed_url = wrapper._compose_and_upload(video_url, fact, animal, 'test_dry_run')
+        # Step 1: Import and create composer
+        steps['step1_import'] = 'starting'
+        from utils.video_composer import VideoComposer
+        import tempfile
+        tmp_dir = tempfile.mkdtemp()
+        composer = VideoComposer(output_dir=tmp_dir)
+        steps['step1_import'] = f'ok - output_dir={tmp_dir}'
 
-        if composed_url:
+        # Step 2: Compose video
+        steps['step2_compose'] = 'starting'
+        composed_path = composer.add_fact_overlay(
+            video_url=video_url,
+            fact_text=fact,
+            animal_name=animal,
+            output_filename='test_dry_run.mp4'
+        )
+        if composed_path and os.path.exists(composed_path):
+            file_size = os.path.getsize(composed_path)
+            steps['step2_compose'] = f'ok - {file_size / 1024 / 1024:.1f}MB at {composed_path}'
+        else:
+            steps['step2_compose'] = f'failed - returned: {composed_path}'
+            return jsonify({'status': 'failed', 'steps': steps}), 500
+
+        # Step 3: Upload to temp host
+        steps['step3_upload'] = 'starting'
+        import requests as req
+        with open(composed_path, 'rb') as f:
+            upload_resp = req.post(
+                'https://0x0.st',
+                files={'file': ('test_dry_run.mp4', f, 'video/mp4')},
+                timeout=120
+            )
+        steps['step3_upload'] = f'status={upload_resp.status_code}, body={upload_resp.text[:200]}'
+
+        if upload_resp.status_code == 200:
+            hosted_url = upload_resp.text.strip()
             return jsonify({
                 'status': 'success',
-                'composed_url': composed_url,
+                'composed_url': hosted_url,
                 'original_url': video_url,
                 'fact': fact,
                 'animal': animal,
+                'steps': steps,
                 'message': 'Composed and uploaded. NOT posted to Blotato.'
             })
         else:
-            return jsonify({'status': 'failed', 'message': 'Composition or upload failed'}), 500
+            return jsonify({'status': 'upload_failed', 'steps': steps}), 500
+
     except Exception as e:
-        import traceback
-        return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
+        steps['error'] = str(e)
+        steps['traceback'] = tb.format_exc()
+        return jsonify({'status': 'exception', 'steps': steps}), 500
 
 
 @app.route('/api/debug/test-blotato-post', methods=['POST'])
