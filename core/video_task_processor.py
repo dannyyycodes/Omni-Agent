@@ -209,12 +209,22 @@ class VideoTaskProcessor:
                     output_filename=f"sora_{task.task_id[:12]}.mp4"
                 )
 
-                if final_video_path:
-                    # Use the local composed video path for posting
-                    final_video_url = final_video_path
-                    logger.info(f"✅ Video composed with overlay: {final_video_path}")
+                if final_video_path and os.path.exists(final_video_path):
+                    # Convert local path to public URL so it's accessible externally
+                    railway_domain = os.environ.get('RAILWAY_PUBLIC_DOMAIN', '')
+                    if railway_domain:
+                        # Extract relative path from static/ onwards
+                        static_idx = final_video_path.replace('\\', '/').find('static/')
+                        if static_idx >= 0:
+                            relative_path = final_video_path.replace('\\', '/')[static_idx:]
+                            final_video_url = f"https://{railway_domain}/{relative_path}"
+                            logger.info(f"✅ Video composed with overlay: {final_video_url}")
+                        else:
+                            logger.warning(f"Composed video not in static dir: {final_video_path}, using raw video")
+                    else:
+                        logger.warning("RAILWAY_PUBLIC_DOMAIN not set, using raw video URL")
                 else:
-                    logger.warning("Composition returned None, using raw video")
+                    logger.warning("Composition returned None or file missing, using raw video")
             except Exception as e:
                 logger.error(f"Video composition failed: {e}, using raw video")
 
