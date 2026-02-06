@@ -59,15 +59,16 @@ Return ONLY this JSON:
     "habitat": "its natural [specific habitat type]",
     "action": "One simple sentence describing ONE calm, natural behavior the animal is doing",
     "environment": "One sentence describing the immediate surroundings with 2-3 specific real details",
-    "texture": "fur/feathers/scales/skin - whatever is correct for this species",
+    "texture": "ONE WORD ONLY: fur OR feathers OR scales OR skin OR shell",
     "lighting": "One sentence about natural lighting conditions"
 }}
 
 RULES:
-- The action must be SIMPLE: standing, walking, eating, resting, looking around. Nothing complex.
+- The action must be SIMPLE and CALM: standing, walking slowly, eating, resting, looking around. Nothing complex or fast.
 - Use specific real-world details, not vague descriptions.
 - The habitat MUST be scientifically correct for this species.
-- Keep each field to ONE short sentence maximum."""
+- Keep each field to ONE short sentence maximum.
+- "texture" must be exactly ONE WORD: fur, feathers, scales, skin, or shell. Nothing else."""
 
     try:
         result = model_router.complete(
