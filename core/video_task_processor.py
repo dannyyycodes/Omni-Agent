@@ -195,43 +195,14 @@ class VideoTaskProcessor:
 
             logger.info(f"✅ Raw video ready for {task.animal_name}: {video_url}")
 
-            # Compose video with text overlay (white bar + fact)
-            final_video_url = video_url
-            try:
-                from utils.video_composer import VideoComposer
-                composer = VideoComposer()
+            # Post raw Sora video directly to Blotato
+            # Note: Video composition (white bar overlay) is skipped for background tasks
+            # because Railway's ephemeral filesystem loses local files on redeploy.
+            # The fact text is included in platform-specific captions instead.
+            # TODO: Add Cloudinary/S3 upload for composed videos in future
+            task.video_url = video_url
 
-                logger.info(f"🎨 Adding text overlay for {task.animal_name}...")
-                final_video_path = composer.add_fact_overlay(
-                    video_url=video_url,
-                    fact_text=task.fact_text,
-                    animal_name=task.animal_name,
-                    output_filename=f"sora_{task.task_id[:12]}.mp4"
-                )
-
-                if final_video_path and os.path.exists(final_video_path):
-                    # Convert local path to public URL so it's accessible externally
-                    railway_domain = os.environ.get('RAILWAY_PUBLIC_DOMAIN', 'web-production-770b9.up.railway.app')
-                    if railway_domain:
-                        # Extract relative path from static/ onwards
-                        static_idx = final_video_path.replace('\\', '/').find('static/')
-                        if static_idx >= 0:
-                            relative_path = final_video_path.replace('\\', '/')[static_idx:]
-                            final_video_url = f"https://{railway_domain}/{relative_path}"
-                            logger.info(f"✅ Video composed with overlay: {final_video_url}")
-                        else:
-                            logger.warning(f"Composed video not in static dir: {final_video_path}, using raw video")
-                    else:
-                        logger.warning("RAILWAY_PUBLIC_DOMAIN not set, using raw video URL")
-                else:
-                    logger.warning("Composition returned None or file missing, using raw video")
-            except Exception as e:
-                logger.error(f"Video composition failed: {e}, using raw video")
-
-            task.video_url = final_video_url
-
-            # Post to Blotato
-            self._post_to_blotato(task, final_video_url)
+            self._post_to_blotato(task, video_url)
             
             # Mark as completed
             task.status = 'completed'
