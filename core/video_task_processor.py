@@ -184,12 +184,36 @@ class VideoTaskProcessor:
             if not video_url:
                 logger.warning(f"No video URL in resultJson for {task.task_id}")
                 return
-            
-            logger.info(f"✅ Video ready for {task.animal_name}: {video_url}")
-            task.video_url = video_url
-            
+
+            logger.info(f"✅ Raw video ready for {task.animal_name}: {video_url}")
+
+            # Compose video with text overlay (white bar + fact)
+            final_video_url = video_url
+            try:
+                from utils.video_composer import VideoComposer
+                composer = VideoComposer()
+
+                logger.info(f"🎨 Adding text overlay for {task.animal_name}...")
+                final_video_path = composer.add_fact_overlay(
+                    video_url=video_url,
+                    fact_text=task.fact_text,
+                    animal_name=task.animal_name,
+                    output_filename=f"sora_{task.task_id[:12]}.mp4"
+                )
+
+                if final_video_path:
+                    # Use the local composed video path for posting
+                    final_video_url = final_video_path
+                    logger.info(f"✅ Video composed with overlay: {final_video_path}")
+                else:
+                    logger.warning("Composition returned None, using raw video")
+            except Exception as e:
+                logger.error(f"Video composition failed: {e}, using raw video")
+
+            task.video_url = final_video_url
+
             # Post to Blotato
-            self._post_to_blotato(task, video_url)
+            self._post_to_blotato(task, final_video_url)
             
             # Mark as completed
             task.status = 'completed'
@@ -199,35 +223,58 @@ class VideoTaskProcessor:
             logger.error(f"Error handling completion: {e}")
             raise
     
-    def _post_to_blotato(self, task, video_url):
+    def _post_to_blotato(self, task, video_path_or_url):
         """Post completed video to Blotato"""
         blotato_key = os.environ.get('BLOTATO_API_KEY')
         if not blotato_key:
             logger.warning("Missing BLOTATO_API_KEY, skipping post")
             return
-        
+
         try:
-            # Download video
-            logger.info(f"📥 Downloading video: {video_url}")
-            video_resp = requests.get(video_url, timeout=60)
-            video_resp.raise_for_status()
-            
-            # Post to Blotato
+            # Get video content - either from local file or URL
+            if video_path_or_url.startswith('http'):
+                logger.info(f"📥 Downloading video: {video_path_or_url[:50]}...")
+                video_resp = requests.get(video_path_or_url, timeout=120)
+                video_resp.raise_for_status()
+                video_content = video_resp.content
+            else:
+                # Local file path
+                logger.info(f"📂 Reading local video: {video_path_or_url}")
+                with open(video_path_or_url, 'rb') as f:
+                    video_content = f.read()
+
+            # Post to Blotato with platform-optimized captions
             logger.info(f"📤 Posting to Blotato...")
+
+            # Generate platform-specific content
+            yt_title = f"Did You Know This About {task.animal_name}? 🐾 #shorts"
+            if len(yt_title) > 100:
+                yt_title = f"{task.animal_name} Facts 🐾 #shorts"
+
+            hashtags = "#animals #wildlife #nature #facts #didyouknow #animalfacts"
+            tiktok_caption = f"🐾 {task.fact_text[:150]}{'...' if len(task.fact_text) > 150 else ''}\n\n{hashtags}"
+            ig_caption = f"🐾 Did you know?\n\n{task.fact_text}\n\nFollow @howanimalslove for more!\n\n{hashtags}"
+
             blotato_resp = requests.post(
-                "https://api.blotato.com/v1/post",
+                "https://api.blotato.com/v1/posts/create",
                 headers={"Authorization": f"Bearer {blotato_key}"},
-                files={"video": ("video.mp4", video_resp.content, "video/mp4")},
-                data={
-                    "caption": task.caption,
-                    "platforms": "tiktok,instagram,youtube_shorts"
+                json={
+                    "video_url": video_path_or_url if video_path_or_url.startswith('http') else None,
+                    "caption": ig_caption,
+                    "title": yt_title,
+                    "platforms": ["instagram", "tiktok", "youtube_shorts"],
+                    "platform_captions": {
+                        "tiktok": tiktok_caption,
+                        "instagram": ig_caption,
+                        "youtube_shorts": f"{yt_title}\n\n{task.fact_text[:200]}"
+                    }
                 },
-                timeout=60
+                timeout=120
             )
             blotato_resp.raise_for_status()
-            
+
             logger.info(f"✅ Posted to social media: {task.animal_name}")
-            
+
         except Exception as e:
             logger.error(f"Blotato posting failed: {e}")
             # Don't raise - we have the video, posting can be retried separately
