@@ -241,15 +241,27 @@ class VideoTaskProcessor:
             logger.error(f"Error handling completion: {e}")
             raise
     
-    def _post_to_blotato(self, task, video_path_or_url):
-        """Post completed video to Blotato with 3-layer content"""
+    # Blotato v2 account IDs for target platforms
+    BLOTATO_ACCOUNTS = {
+        'tiktok': '22514',      # @astropetsofficial
+        'youtube': '19977',     # Danny (animals)
+        'instagram': '22251',   # @starpawsen
+    }
+
+    def _post_to_blotato(self, task, video_url):
+        """Post completed video to Blotato v2 API with account-specific targeting"""
         blotato_key = os.environ.get('BLOTATO_API_KEY')
         if not blotato_key:
             logger.warning("Missing BLOTATO_API_KEY, skipping post")
             return
 
+        # Video must be a public URL for Blotato
+        if not video_url or not video_url.startswith('http'):
+            logger.error(f"Cannot post to Blotato: video_url is not a public URL: {video_url}")
+            return
+
         try:
-            # Try to parse fact_data from caption field (stored as JSON by async wrapper)
+            # Parse fact_data from caption field (stored as JSON by async wrapper)
             short_fact = task.fact_text or ''
             description = short_fact
             hashtags = '#AnimalFacts #Wildlife #Nature #Animals'
@@ -264,42 +276,86 @@ class VideoTaskProcessor:
             except (json.JSONDecodeError, TypeError):
                 logger.info("📝 Using legacy caption format")
 
-            # Post to Blotato with platform-optimized captions
-            logger.info(f"📤 Posting to Blotato...")
+            logger.info(f"📤 Posting to Blotato v2...")
 
-            # YouTube Shorts: catchy title
+            headers = {"blotato-api-key": blotato_key, "Content-Type": "application/json"}
+            base_url = "https://backend.blotato.com/v2/posts"
+
             yt_title = f"Did You Know This About {task.animal_name}? 🐾 #shorts"
             if len(yt_title) > 100:
                 yt_title = f"{task.animal_name} Facts 🐾 #shorts"
 
-            # TikTok: short fact + hashtags
-            tiktok_caption = f"🐾 {short_fact}\n\n{hashtags}"
-
-            # Instagram: full description + CTA + hashtags
-            ig_caption = f"🐾 {short_fact}\n\n{description}\n\nFollow @howanimalslove for more amazing animal facts!\n\n{hashtags}"
-
-            # YouTube description: expanded
-            yt_description = f"{yt_title}\n\n{description}\n\n{hashtags}"
-
-            blotato_resp = requests.post(
-                "https://api.blotato.com/v1/posts/create",
-                headers={"Authorization": f"Bearer {blotato_key}"},
-                json={
-                    "video_url": video_path_or_url if video_path_or_url.startswith('http') else None,
-                    "caption": ig_caption,
-                    "title": yt_title,
-                    "platforms": ["instagram", "tiktok", "youtube_shorts"],
-                    "platform_captions": {
-                        "tiktok": tiktok_caption,
-                        "instagram": ig_caption,
-                        "youtube_shorts": yt_description
+            # 1. TikTok (@astropetsofficial)
+            try:
+                resp = requests.post(base_url, headers=headers, json={
+                    "post": {
+                        "accountId": self.BLOTATO_ACCOUNTS['tiktok'],
+                        "content": {
+                            "text": f"🐾 {short_fact}\n\n{hashtags}",
+                            "mediaUrls": [video_url],
+                            "platform": "tiktok"
+                        },
+                        "target": {
+                            "targetType": "tiktok",
+                            "privacyLevel": "PUBLIC_TO_EVERYONE",
+                            "disabledComments": False,
+                            "disabledDuet": False,
+                            "disabledStitch": False,
+                            "isBrandedContent": False,
+                            "isYourBrand": False,
+                            "isAiGenerated": True
+                        }
                     }
-                },
-                timeout=120
-            )
-            blotato_resp.raise_for_status()
+                }, timeout=60)
+                logger.info(f"📱 TikTok: {resp.status_code}")
+            except Exception as e:
+                logger.error(f"TikTok post failed: {e}")
 
-            logger.info(f"✅ Posted to social media: {task.animal_name}")
+            # 2. YouTube Shorts (Danny animals)
+            try:
+                resp = requests.post(base_url, headers=headers, json={
+                    "post": {
+                        "accountId": self.BLOTATO_ACCOUNTS['youtube'],
+                        "content": {
+                            "text": f"{description}\n\n{hashtags}",
+                            "mediaUrls": [video_url],
+                            "platform": "youtube"
+                        },
+                        "target": {
+                            "targetType": "youtube",
+                            "title": yt_title,
+                            "privacyStatus": "public",
+                            "shouldNotifySubscribers": True,
+                            "isMadeForKids": False,
+                            "containsSyntheticMedia": True
+                        }
+                    }
+                }, timeout=60)
+                logger.info(f"📺 YouTube: {resp.status_code}")
+            except Exception as e:
+                logger.error(f"YouTube post failed: {e}")
+
+            # 3. Instagram (@starpawsen)
+            try:
+                resp = requests.post(base_url, headers=headers, json={
+                    "post": {
+                        "accountId": self.BLOTATO_ACCOUNTS['instagram'],
+                        "content": {
+                            "text": f"🐾 {short_fact}\n\n{description}\n\nFollow @howanimalslove for more amazing animal facts!\n\n{hashtags}",
+                            "mediaUrls": [video_url],
+                            "platform": "instagram"
+                        },
+                        "target": {
+                            "targetType": "instagram",
+                            "mediaType": "reel"
+                        }
+                    }
+                }, timeout=60)
+                logger.info(f"📸 Instagram: {resp.status_code}")
+            except Exception as e:
+                logger.error(f"Instagram post failed: {e}")
+
+            logger.info(f"✅ Posted to all platforms: {task.animal_name}")
 
         except Exception as e:
             logger.error(f"Blotato posting failed: {e}")
