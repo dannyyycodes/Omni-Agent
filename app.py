@@ -890,6 +890,25 @@ def api_test_pexels():
         }), 500
 
 
+@app.route('/api/debug/blotato-accounts', methods=['GET'])
+def api_blotato_accounts():
+    """List all connected Blotato accounts with their IDs"""
+    try:
+        blotato_key = os.environ.get('BLOTATO_API_KEY')
+        if not blotato_key:
+            return jsonify({'error': 'BLOTATO_API_KEY not configured'}), 500
+
+        resp = requests.get(
+            "https://backend.blotato.com/v2/users/me/accounts",
+            headers={"blotato-api-key": blotato_key},
+            timeout=30
+        )
+        resp.raise_for_status()
+        return jsonify(resp.json())
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/animal-facts/search-pexels', methods=['POST'])
 def api_search_pexels():
     """
