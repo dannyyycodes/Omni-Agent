@@ -92,10 +92,11 @@ class AnimalFactsWorkflow:
             
         print(f"🐾 Selected: {animal['name']}")
         
-        # 2. Generate Fact using AI
+        # 2. Generate 3-layer Fact using AI (short_fact, description, hashtags)
         print("🧠 Generating fact...")
-        fact = self._generate_fact(animal)
-        print(f"📝 Fact: {fact[:60]}...")
+        fact_data = self._generate_fact(animal)
+        fact = fact_data['short_fact']  # Short fact for video overlay
+        print(f"📝 Fact ({fact_data.get('emotion', '?')}): {fact[:60]}...")
         
         # 3. Generate Sora Prompt (with duration)
         sora_prompt = self._build_sora_prompt(animal, duration=duration)
@@ -159,7 +160,8 @@ class AnimalFactsWorkflow:
                                         'prompt_style': 'in its natural habitat'
                                     }
                                     print(f"✅ Found video for {animal['name']}, regenerating fact...")
-                                    fact = self._generate_fact(animal)
+                                    fact_data = self._generate_fact(animal)
+                                    fact = fact_data['short_fact']
                                     print(f"📝 New fact: {fact[:60]}...")
                                     break
 
@@ -178,7 +180,7 @@ class AnimalFactsWorkflow:
                         except:
                             pass
                     else:
-                        logger.error(f"No Pexels video found after {max_attempts} animal attempts")
+                        logger.error(f"No Pexels video found after trying safe animals list")
                 else:
                     logger.error("Pexels API key not configured")
             except Exception as e:
@@ -204,18 +206,20 @@ class AnimalFactsWorkflow:
                 "status": "dry_run_success",
                 "animal": animal['name'],
                 "fact": fact,
+                "description": fact_data.get('description', ''),
+                "hashtags": fact_data.get('hashtags', ''),
+                "emotion": fact_data.get('emotion', ''),
                 "video": final_video,
                 "sora_prompt": sora_prompt,
                 "duration": duration,
                 "message": "🧪 DRY RUN: Video generated successfully! Not posted to socials."
             }
-        
-        caption = f"🐾 Did you know? {fact[:100]}... #animals #facts #wildlife #nature"
+
         blotato_key = os.environ.get('BLOTATO_API_KEY')
 
         if blotato_key:
             try:
-                post_result = self._post_blotato(blotato_key, final_video, caption, animal['name'], fact)
+                post_result = self._post_blotato(blotato_key, final_video, None, animal['name'], fact_data)
                 return {
                     "status": "success",
                     "animal": animal['name'],
@@ -241,34 +245,89 @@ class AnimalFactsWorkflow:
                 "message": "Video ready but Blotato key missing."
             }
     
-    def _generate_fact(self, animal):
-        """Use AI to generate an interesting fact about the animal"""
-        prompt = f"""Generate ONE fascinating, little-known fact about {animal['name']}.
-        
-Rules:
-- Start with "Did you know"
-- Keep it under 100 words
-- Make it surprising and shareable
-- Include a specific number or stat if possible
-- No emojis
+    # Emotional categories to rotate through for content variety
+    EMOTION_CATEGORIES = [
+        'joy',       # Play, bonding, affection, innocence, warmth
+        'awe',       # Extreme abilities, beauty, intelligence, evolution
+        'empathy',   # Grief, loss, loyalty, vulnerability, survival
+        'curiosity', # Strange biology, unexpected behaviors, "I didn't know that"
+        'power',     # Strength, dominance, resilience, ancient presence
+    ]
 
-Example: "Did you know that emperor penguins can hold their breath for up to 20 minutes while diving to depths of 1,800 feet?"
-"""
+    def _generate_fact(self, animal):
+        """
+        Generate a 3-layer viral fact: short on-screen fact, expanded description, hashtags.
+        Rotates through emotional categories for content variety.
+        Returns dict with 'short_fact', 'description', 'hashtags', 'emotion'.
+        """
+        # Pick an emotion to target (rotate randomly)
+        emotion = random.choice(self.EMOTION_CATEGORIES)
+        emotion_guidance = {
+            'joy': 'Make the viewer smile or feel warmth. Focus on bonding, play, affection, or innocence.',
+            'awe': 'Make the viewer feel wonder. Focus on extreme abilities, beauty, intelligence, or evolution.',
+            'empathy': 'Make the viewer feel something deep. Focus on loyalty, grief, vulnerability, or survival.',
+            'curiosity': 'Make the viewer think "wait, what?" Focus on strange biology, unexpected behaviors, weird facts.',
+            'power': 'Make the viewer feel respect. Focus on strength, dominance, resilience, or ancient presence.',
+        }
+
+        prompt = f"""Generate a viral animal fact about {animal['name']} for a short-form video.
+
+EMOTIONAL TONE: {emotion.upper()} — {emotion_guidance[emotion]}
+
+Return ONLY this JSON:
+{{
+    "short_fact": "[1-2 lines max. Written to stop someone from scrolling. Emotionally charged but accurate. Must be readable in under 2 seconds. Do NOT start with 'Did you know'. Example: 'Sea otters hold hands when they sleep — so they don't drift apart.']",
+    "description": "[3-5 sentences expanding on the same fact. Add context, evolutionary reason, or emotional framing. Make the viewer feel something while learning. Do NOT repeat the exact wording of the short fact. This is where depth lives.]",
+    "hashtags": "[5-8 relevant hashtags. Mix broad (#Wildlife #Nature) with specific (animal name, behavior). No spammy tags.]"
+}}
+
+RULES:
+- The fact must be ACCURATE and about {animal['name']} specifically.
+- short_fact: Emotionally punchy, not generic. No clichés like "nature is amazing" or "you won't believe".
+- description: Written like a human storyteller, not a textbook. Vivid but natural language.
+- Both must reference the SAME fact — the description expands on what the short_fact hooks.
+- No emojis in short_fact. Emojis OK in description and hashtags."""
+
         try:
-            fact = self.model_router.complete(
+            result = self.model_router.complete(
                 prompt,
-                system="You are a wildlife expert. Return only the fact, nothing else.",
-                max_tokens=150
+                system="You are a viral wildlife content creator. Return only valid JSON.",
+                max_tokens=400
             )
-            return fact.strip().strip('"')
-        except:
-            # Fallback facts
-            fallbacks = {
-                "penguin": "Did you know emperor penguins can hold their breath for up to 20 minutes?",
-                "elephant": "Did you know elephants are the only animals that can't jump?",
-                "dolphin": "Did you know dolphins sleep with one eye open?",
+
+            import re
+            match = re.search(r'\{.*\}', result, re.DOTALL)
+            if match:
+                data = json.loads(match.group())
+                if all(k in data for k in ['short_fact', 'description', 'hashtags']):
+                    # Clean up
+                    data['short_fact'] = data['short_fact'].strip().strip('"')
+                    data['description'] = data['description'].strip().strip('"')
+                    data['hashtags'] = data['hashtags'].strip()
+                    data['emotion'] = emotion
+                    return data
+
+            raise ValueError("Invalid JSON from AI")
+
+        except Exception as e:
+            logger.warning(f"3-layer fact generation failed: {e}, using simple fallback")
+            # Fallback: generate simple fact
+            try:
+                simple = self.model_router.complete(
+                    f"Write one fascinating, specific fact about {animal['name']} in under 20 words. No 'Did you know' prefix.",
+                    system="Return only the fact.",
+                    max_tokens=60
+                )
+                short = simple.strip().strip('"')
+            except:
+                short = f"{animal['name']}s have behaviors that scientists are still trying to fully understand."
+
+            return {
+                'short_fact': short,
+                'description': f"{short} These remarkable creatures continue to fascinate researchers and wildlife enthusiasts around the world.",
+                'hashtags': f"#AnimalFacts #{animal['name'].replace(' ', '')} #Wildlife #Nature #Animals",
+                'emotion': 'curiosity'
             }
-            return fallbacks.get(animal['id'], f"Did you know {animal['name']}s are amazing creatures?")
     
     def _generate_random_animal(self):
         """Use AI to generate a random interesting animal - unlimited variety!"""
@@ -519,39 +578,56 @@ The prompt_style should describe a cinematic action the animal does."""
             title=animal_name
         )
     
-    def _post_blotato(self, key, video_url, caption, animal_name=None, fact=None):
-        """Post to social platforms via Blotato with platform-optimized content"""
+    def _post_blotato(self, key, video_url, caption, animal_name=None, fact_data=None):
+        """Post to social platforms via Blotato with 3-layer content"""
 
-        # Generate platform-specific content
-        if animal_name and fact:
-            # YouTube Shorts: needs a catchy title (under 100 chars)
+        # Extract from fact_data dict (new 3-layer system)
+        if isinstance(fact_data, dict):
+            short_fact = fact_data.get('short_fact', '')
+            description = fact_data.get('description', short_fact)
+            hashtags = fact_data.get('hashtags', '#AnimalFacts #Wildlife #Nature')
+        elif isinstance(fact_data, str):
+            # Backwards compatibility: plain string fact
+            short_fact = fact_data
+            description = fact_data
+            hashtags = '#AnimalFacts #Wildlife #Nature #Animals'
+        else:
+            short_fact = caption or ''
+            description = caption or ''
+            hashtags = '#AnimalFacts #Wildlife #Nature'
+
+        if animal_name:
+            # YouTube Shorts: catchy title
             yt_title = f"Did You Know This About {animal_name}? 🐾 #shorts"
             if len(yt_title) > 100:
                 yt_title = f"{animal_name} Facts 🐾 #shorts"
 
-            # TikTok/Instagram: hashtag-rich caption
-            hashtags = "#animals #wildlife #nature #facts #didyouknow #animalfacts #fascinating #education #viral"
-            tiktok_caption = f"🐾 {fact[:150]}{'...' if len(fact) > 150 else ''}\n\n{hashtags}"
+            # TikTok: short fact + hashtags (150 char limit on visible text)
+            tiktok_caption = f"🐾 {short_fact}\n\n{hashtags}"
 
-            # Instagram: similar but with more description
-            ig_caption = f"🐾 Did you know?\n\n{fact}\n\nFollow @howanimalslove for more amazing animal facts!\n\n{hashtags}"
+            # Instagram: full description + CTA + hashtags
+            ig_caption = f"🐾 {short_fact}\n\n{description}\n\nFollow @howanimalslove for more amazing animal facts!\n\n{hashtags}"
+
+            # YouTube description: expanded
+            yt_description = f"{yt_title}\n\n{description}\n\n{hashtags}"
         else:
             yt_title = "Amazing Animal Facts 🐾 #shorts"
-            tiktok_caption = caption
-            ig_caption = caption
+            tiktok_caption = caption or short_fact
+            ig_caption = caption or description
+            yt_description = caption or description
 
         resp = requests.post(
             "https://api.blotato.com/v1/posts/create",
             headers={"Authorization": f"Bearer {key}"},
             json={
                 "video_url": video_url,
-                "caption": ig_caption,  # Primary caption
-                "title": yt_title,  # YouTube title
+                "caption": ig_caption,
+                "title": yt_title,
                 "platforms": ["instagram", "tiktok", "youtube_shorts"],
                 "platform_captions": {
                     "tiktok": tiktok_caption,
                     "instagram": ig_caption,
-                    "youtube_shorts": f"{yt_title}\n\n{fact[:200] if fact else caption}"
+                    "youtube_shorts": yt_description
                 }
             },
             timeout=60
@@ -562,19 +638,21 @@ The prompt_style should describe a cinematic action the animal does."""
 
     def preview(self, animal_id=None):
         """Generate a preview without actually calling video APIs (saves credits)"""
-        # Use dynamic generation just like run()
         if animal_id:
             animal = {'id': animal_id, 'name': animal_id.title(), 'prompt_style': 'in its natural habitat'}
         else:
             animal = self._generate_random_animal()
-        
-        fact = self._generate_fact(animal)
+
+        fact_data = self._generate_fact(animal)
         prompt = self._build_sora_prompt(animal)
-        
+
         return {
             "status": "preview",
             "animal": animal['name'],
-            "fact": fact,
+            "fact": fact_data['short_fact'],
+            "description": fact_data.get('description', ''),
+            "hashtags": fact_data.get('hashtags', ''),
+            "emotion": fact_data.get('emotion', ''),
             "sora_prompt": prompt,
             "message": "Preview generated. Use run() to execute the full workflow."
         }
@@ -582,26 +660,30 @@ The prompt_style should describe a cinematic action the animal does."""
     def visual_preview(self, animal_id=None):
         """Generate a visual mockup image showing the video layout"""
         from utils.video_composer import create_preview_image
-        
+
         # Generate animal and fact
         if animal_id:
             animal = {'id': animal_id, 'name': animal_id.title(), 'prompt_style': 'in its natural habitat'}
         else:
             animal = self._generate_random_animal()
-        
-        fact = self._generate_fact(animal)
-        
+
+        fact_data = self._generate_fact(animal)
+        fact = fact_data['short_fact']
+
         # Create preview image
         output_dir = os.environ.get('VIDEO_OUTPUT_DIR', '/tmp/omni_videos')
         os.makedirs(output_dir, exist_ok=True)
-        
+
         preview_path = os.path.join(output_dir, f"preview_{animal['id']}.png")
         create_preview_image(fact, animal['name'], preview_path)
-        
+
         return {
             "status": "visual_preview",
             "animal": animal['name'],
             "fact": fact,
+            "description": fact_data.get('description', ''),
+            "hashtags": fact_data.get('hashtags', ''),
+            "emotion": fact_data.get('emotion', ''),
             "preview_image": preview_path,
             "message": "Visual mockup created. This shows what the final video frame will look like."
         }

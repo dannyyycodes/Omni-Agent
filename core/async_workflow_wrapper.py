@@ -41,10 +41,11 @@ class AsyncWorkflowWrapper:
             
             logger.info(f"🐾 Selected: {animal['name']}")
             
-            # 2. Generate fact
+            # 2. Generate 3-layer fact (short_fact, description, hashtags)
             logger.info("🧠 Generating fact...")
-            fact = self.workflow._generate_fact(animal)
-            logger.info(f"📝 Fact: {fact[:60]}...")
+            fact_data = self.workflow._generate_fact(animal)
+            fact = fact_data['short_fact']
+            logger.info(f"📝 Fact ({fact_data.get('emotion', '?')}): {fact[:60]}...")
             
             # 3. Generate Sora prompt
             sora_prompt = self.workflow._build_sora_prompt(animal, duration=duration)
@@ -72,7 +73,10 @@ class AsyncWorkflowWrapper:
 
             # If Sora succeeded, save task for background processing
             if task_id:
-                caption = f"🐾 Did you know? {fact[:100]}... #animals #facts #wildlife #nature"
+                # Store the full fact_data as JSON for platform-specific captions later
+                import json
+                fact_data_json = json.dumps(fact_data)
+                caption = fact_data_json  # Store full fact_data in caption field
                 self._save_pending_task(task_id, animal['name'], fact, sora_prompt, caption, duration)
                 return {
                     "status": "started",
@@ -80,6 +84,8 @@ class AsyncWorkflowWrapper:
                     "task_id": task_id,
                     "animal": animal['name'],
                     "fact": fact[:100] + "...",
+                    "description": fact_data.get('description', '')[:100] + "...",
+                    "emotion": fact_data.get('emotion', ''),
                     "estimated_time": "2-5 minutes",
                     "status_url": f"/api/tasks/{task_id}",
                     "video_source": "sora"
@@ -119,13 +125,12 @@ class AsyncWorkflowWrapper:
                     final_video = video_url
 
                 # Post to Blotato immediately (Pexels is instant)
-                caption = f"🐾 Did you know? {fact[:100]}... #animals #facts #wildlife #nature"
                 blotato_key = os.environ.get('BLOTATO_API_KEY')
                 posted = False
 
                 if blotato_key:
                     try:
-                        self.workflow._post_blotato(blotato_key, final_video, caption, animal['name'], fact)
+                        self.workflow._post_blotato(blotato_key, final_video, None, animal['name'], fact_data)
                         posted = True
                         logger.info("✅ Posted to social media via Pexels fallback")
                     except Exception as e:
@@ -136,6 +141,8 @@ class AsyncWorkflowWrapper:
                     "message": f"✅ Video ready for {animal['name']} (via Pexels fallback)!",
                     "animal": animal['name'],
                     "fact": fact[:100] + "...",
+                    "description": fact_data.get('description', '')[:100] + "...",
+                    "emotion": fact_data.get('emotion', ''),
                     "video": final_video,
                     "video_source": "pexels",
                     "posted": posted

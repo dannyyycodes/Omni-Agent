@@ -224,36 +224,44 @@ class VideoTaskProcessor:
             raise
     
     def _post_to_blotato(self, task, video_path_or_url):
-        """Post completed video to Blotato"""
+        """Post completed video to Blotato with 3-layer content"""
         blotato_key = os.environ.get('BLOTATO_API_KEY')
         if not blotato_key:
             logger.warning("Missing BLOTATO_API_KEY, skipping post")
             return
 
         try:
-            # Get video content - either from local file or URL
-            if video_path_or_url.startswith('http'):
-                logger.info(f"📥 Downloading video: {video_path_or_url[:50]}...")
-                video_resp = requests.get(video_path_or_url, timeout=120)
-                video_resp.raise_for_status()
-                video_content = video_resp.content
-            else:
-                # Local file path
-                logger.info(f"📂 Reading local video: {video_path_or_url}")
-                with open(video_path_or_url, 'rb') as f:
-                    video_content = f.read()
+            # Try to parse fact_data from caption field (stored as JSON by async wrapper)
+            short_fact = task.fact_text or ''
+            description = short_fact
+            hashtags = '#AnimalFacts #Wildlife #Nature #Animals'
+
+            try:
+                fact_data = json.loads(task.caption) if task.caption else None
+                if isinstance(fact_data, dict) and 'short_fact' in fact_data:
+                    short_fact = fact_data['short_fact']
+                    description = fact_data.get('description', short_fact)
+                    hashtags = fact_data.get('hashtags', hashtags)
+                    logger.info(f"📝 Using 3-layer captions (emotion: {fact_data.get('emotion', '?')})")
+            except (json.JSONDecodeError, TypeError):
+                logger.info("📝 Using legacy caption format")
 
             # Post to Blotato with platform-optimized captions
             logger.info(f"📤 Posting to Blotato...")
 
-            # Generate platform-specific content
+            # YouTube Shorts: catchy title
             yt_title = f"Did You Know This About {task.animal_name}? 🐾 #shorts"
             if len(yt_title) > 100:
                 yt_title = f"{task.animal_name} Facts 🐾 #shorts"
 
-            hashtags = "#animals #wildlife #nature #facts #didyouknow #animalfacts"
-            tiktok_caption = f"🐾 {task.fact_text[:150]}{'...' if len(task.fact_text) > 150 else ''}\n\n{hashtags}"
-            ig_caption = f"🐾 Did you know?\n\n{task.fact_text}\n\nFollow @howanimalslove for more!\n\n{hashtags}"
+            # TikTok: short fact + hashtags
+            tiktok_caption = f"🐾 {short_fact}\n\n{hashtags}"
+
+            # Instagram: full description + CTA + hashtags
+            ig_caption = f"🐾 {short_fact}\n\n{description}\n\nFollow @howanimalslove for more amazing animal facts!\n\n{hashtags}"
+
+            # YouTube description: expanded
+            yt_description = f"{yt_title}\n\n{description}\n\n{hashtags}"
 
             blotato_resp = requests.post(
                 "https://api.blotato.com/v1/posts/create",
@@ -266,7 +274,7 @@ class VideoTaskProcessor:
                     "platform_captions": {
                         "tiktok": tiktok_caption,
                         "instagram": ig_caption,
-                        "youtube_shorts": f"{yt_title}\n\n{task.fact_text[:200]}"
+                        "youtube_shorts": yt_description
                     }
                 },
                 timeout=120
