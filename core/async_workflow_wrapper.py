@@ -249,22 +249,32 @@ class AsyncWorkflowWrapper:
                     pass
                 return
 
+            # Compose video with fact overlay (white bar + text)
+            final_url = video_url
+            try:
+                composed_url = self._compose_and_upload(video_url, fact_data['short_fact'], animal_name, task_id)
+                if composed_url:
+                    final_url = composed_url
+                    logger.info(f"✅ Composed video uploaded: {composed_url[:60]}...")
+                else:
+                    logger.warning("Composition failed, posting raw video")
+            except Exception as e:
+                logger.error(f"Composition error: {e}, posting raw video")
+
             # Post to Blotato
             blotato_key = os.environ.get('BLOTATO_API_KEY')
             if blotato_key:
                 try:
                     from workflows.animal_facts import AnimalFactsWorkflow
-                    # Use a temporary workflow instance just for posting
-                    AnimalFactsWorkflow._post_blotato_v2(blotato_key, video_url, animal_name, fact_data)
+                    AnimalFactsWorkflow._post_blotato_v2(blotato_key, final_url, animal_name, fact_data)
                     logger.info(f"✅ Posted {animal_name} to all platforms!")
                     if task_id in _active_tasks:
                         _active_tasks[task_id]['status'] = 'posted'
-                        _active_tasks[task_id]['video_url'] = video_url
+                        _active_tasks[task_id]['video_url'] = final_url
 
-                    # Alert success
                     try:
                         from core.alerter import get_alerter
-                        get_alerter().alert_task_completed(animal=animal_name, video_url=video_url, posted=True)
+                        get_alerter().alert_task_completed(animal=animal_name, video_url=final_url, posted=True)
                     except:
                         pass
 
@@ -273,18 +283,71 @@ class AsyncWorkflowWrapper:
                     if task_id in _active_tasks:
                         _active_tasks[task_id]['status'] = 'post_failed'
                         _active_tasks[task_id]['error'] = str(e)
-                        _active_tasks[task_id]['video_url'] = video_url
+                        _active_tasks[task_id]['video_url'] = final_url
             else:
                 logger.warning("No BLOTATO_API_KEY, video generated but not posted")
                 if task_id in _active_tasks:
                     _active_tasks[task_id]['status'] = 'generated'
-                    _active_tasks[task_id]['video_url'] = video_url
+                    _active_tasks[task_id]['video_url'] = final_url
 
         except Exception as e:
             logger.error(f"❌ Background thread error for {animal_name}: {e}")
             if task_id in _active_tasks:
                 _active_tasks[task_id]['status'] = 'error'
                 _active_tasks[task_id]['error'] = str(e)
+
+
+    def _compose_and_upload(self, video_url, fact_text, animal_name, task_id):
+        """Compose video with fact overlay, upload to temp host, return public URL"""
+        try:
+            from utils.video_composer import VideoComposer
+            import tempfile
+
+            composer = VideoComposer(output_dir=tempfile.mkdtemp())
+            output_filename = f"sora_{task_id[:12]}.mp4"
+
+            logger.info(f"🎨 Composing video with fact overlay for {animal_name}...")
+            composed_path = composer.add_fact_overlay(
+                video_url=video_url,
+                fact_text=fact_text,
+                animal_name=animal_name,
+                output_filename=output_filename
+            )
+
+            if not composed_path or not os.path.exists(composed_path):
+                logger.warning("Composition produced no file")
+                return None
+
+            file_size = os.path.getsize(composed_path)
+            logger.info(f"📦 Composed video: {file_size / 1024 / 1024:.1f}MB")
+
+            # Upload to 0x0.st (free, no API key, 30-day retention)
+            logger.info("📤 Uploading composed video to temp host...")
+            with open(composed_path, 'rb') as f:
+                upload_resp = requests.post(
+                    'https://0x0.st',
+                    files={'file': (output_filename, f, 'video/mp4')},
+                    timeout=120
+                )
+
+            if upload_resp.status_code == 200:
+                hosted_url = upload_resp.text.strip()
+                logger.info(f"✅ Uploaded: {hosted_url}")
+
+                # Cleanup local file
+                try:
+                    os.remove(composed_path)
+                except:
+                    pass
+
+                return hosted_url
+            else:
+                logger.error(f"Upload failed: {upload_resp.status_code} {upload_resp.text[:100]}")
+                return None
+
+        except Exception as e:
+            logger.error(f"Compose+upload failed: {e}")
+            return None
 
 
 def get_active_tasks():
