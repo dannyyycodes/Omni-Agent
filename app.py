@@ -900,6 +900,34 @@ def api_list_videos():
     return jsonify({'videos': files[:20], 'dir': video_dir, 'count': len(files)})
 
 
+@app.route('/api/debug/test-compose-check', methods=['GET'])
+def api_test_compose_check():
+    """Quick check if video composition dependencies are available"""
+    results = {}
+    try:
+        import moviepy.editor as mp
+        results['moviepy'] = 'ok'
+    except Exception as e:
+        results['moviepy'] = str(e)
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+        results['pillow'] = 'ok'
+    except Exception as e:
+        results['pillow'] = str(e)
+    try:
+        from utils.video_composer import VideoComposer
+        results['video_composer'] = 'ok'
+    except Exception as e:
+        results['video_composer'] = str(e)
+    try:
+        import requests as req
+        r = req.head('https://0x0.st', timeout=10)
+        results['0x0st_reachable'] = f'status={r.status_code}'
+    except Exception as e:
+        results['0x0st_reachable'] = str(e)
+    return jsonify(results)
+
+
 @app.route('/api/debug/test-compose-upload', methods=['POST'])
 def api_test_compose_upload():
     """Test compose + upload pipeline WITHOUT posting to Blotato.
