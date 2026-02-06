@@ -900,6 +900,34 @@ def api_list_videos():
     return jsonify({'videos': files[:20], 'dir': video_dir, 'count': len(files)})
 
 
+@app.route('/api/debug/test-blotato-post', methods=['POST'])
+def api_test_blotato_post():
+    """Test posting a video to Blotato v2 with specific accounts"""
+    try:
+        data = request.json or {}
+        video_url = data.get('video_url')
+        animal = data.get('animal', 'Test Animal')
+        fact_data = data.get('fact_data', {
+            'short_fact': 'Test fact',
+            'description': 'Test description',
+            'hashtags': '#Test'
+        })
+
+        if not video_url:
+            return jsonify({'error': 'video_url required'}), 400
+
+        blotato_key = os.environ.get('BLOTATO_API_KEY')
+        if not blotato_key:
+            return jsonify({'error': 'BLOTATO_API_KEY not set'}), 500
+
+        from workflows.animal_facts import AnimalFactsWorkflow
+        results = AnimalFactsWorkflow._post_blotato_v2(blotato_key, video_url, animal, fact_data)
+        return jsonify({'status': 'posted', 'results': results})
+    except Exception as e:
+        import traceback
+        return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
+
+
 @app.route('/api/debug/active-tasks', methods=['GET'])
 def api_active_tasks():
     """List in-memory active tasks (background threads)"""
