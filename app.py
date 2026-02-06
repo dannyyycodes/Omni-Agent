@@ -928,6 +928,39 @@ def api_test_compose_check():
     return jsonify(results)
 
 
+@app.route('/api/debug/test-pexels-search', methods=['GET'])
+def api_test_pexels_search():
+    """Test Pexels API search and show returned video URLs"""
+    try:
+        animal = request.args.get('animal', 'fennec fox')
+        from core.pexels_client import get_pexels_client
+        pexels = get_pexels_client()
+        if not pexels.is_available():
+            return jsonify({'error': 'PEXELS_API_KEY not set'}), 500
+        result = pexels.get_animal_video(animal)
+        if result:
+            # Also try to download it
+            import requests as req
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'Accept': 'video/mp4,video/*,*/*',
+            }
+            try:
+                head_resp = req.head(result['video_url'], timeout=15, headers=headers, allow_redirects=True)
+                result['download_test'] = {
+                    'status_code': head_resp.status_code,
+                    'content_type': head_resp.headers.get('Content-Type', ''),
+                    'final_url': head_resp.url[:120],
+                }
+            except Exception as e:
+                result['download_test'] = {'error': str(e)}
+            return jsonify(result)
+        return jsonify({'error': f'No video found for {animal}'}), 404
+    except Exception as e:
+        import traceback
+        return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
+
+
 @app.route('/api/debug/test-download', methods=['POST'])
 def api_test_download():
     """Test just the video download step"""
