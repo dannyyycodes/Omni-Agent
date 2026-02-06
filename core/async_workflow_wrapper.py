@@ -195,14 +195,8 @@ class AsyncWorkflowWrapper:
                     if state in ['fail', 'failed', 'error']:
                         error_msg = data.get('failMsg') or 'Unknown error'
                         logger.error(f"❌ Sora failed for {animal_name}: {error_msg}")
-                        if task_id in _active_tasks:
-                            _active_tasks[task_id]['status'] = 'failed'
-                            _active_tasks[task_id]['error'] = error_msg
-                        try:
-                            from core.alerter import get_alerter
-                            get_alerter().alert_task_failed(animal=animal_name, error=error_msg, task_id=task_id)
-                        except:
-                            pass
+                        # Try Pexels fallback
+                        self._pexels_fallback(task_id, animal_name, fact_data, f"Sora failed: {error_msg}")
                         return
 
                     # Check failCode
@@ -210,9 +204,7 @@ class AsyncWorkflowWrapper:
                     if fail_code and str(fail_code) != '0':
                         error_msg = data.get('failMsg') or f'failCode: {fail_code}'
                         logger.error(f"❌ Sora failCode for {animal_name}: {error_msg}")
-                        if task_id in _active_tasks:
-                            _active_tasks[task_id]['status'] = 'failed'
-                            _active_tasks[task_id]['error'] = error_msg
+                        self._pexels_fallback(task_id, animal_name, fact_data, f"Sora error: {error_msg}")
                         return
 
                     # Check for completion
@@ -240,13 +232,7 @@ class AsyncWorkflowWrapper:
 
             if not video_url:
                 logger.error(f"❌ Video generation timed out for {animal_name}")
-                if task_id in _active_tasks:
-                    _active_tasks[task_id]['status'] = 'timeout'
-                try:
-                    from core.alerter import get_alerter
-                    get_alerter().alert_task_failed(animal=animal_name, error="Timed out after 5 minutes", task_id=task_id)
-                except:
-                    pass
+                self._pexels_fallback(task_id, animal_name, fact_data, "Sora timed out after 5 minutes")
                 return
 
             # Compose video with fact overlay (white bar + text)
@@ -296,6 +282,74 @@ class AsyncWorkflowWrapper:
                 _active_tasks[task_id]['status'] = 'error'
                 _active_tasks[task_id]['error'] = str(e)
 
+
+    def _pexels_fallback(self, task_id, animal_name, fact_data, sora_error):
+        """Fallback to Pexels when Sora fails during generation"""
+        logger.info(f"🔄 Sora failed for {animal_name}, trying Pexels fallback...")
+        try:
+            from core.pexels_client import get_pexels_client
+            from workflows.animal_facts import AnimalFactsWorkflow
+
+            pexels = get_pexels_client()
+            if not pexels or not pexels.is_available():
+                logger.error("Pexels not available for fallback")
+                if task_id in _active_tasks:
+                    _active_tasks[task_id]['status'] = 'failed'
+                    _active_tasks[task_id]['error'] = f"{sora_error} | Pexels unavailable"
+                return
+
+            pexels_result = pexels.get_animal_video(animal_name)
+
+            # If no video for this animal, try safe animals
+            if not pexels_result:
+                safe_animals = ['Lion', 'Eagle', 'Dolphin', 'Elephant', 'Tiger',
+                               'Wolf', 'Bear', 'Fox', 'Owl', 'Penguin']
+                import random
+                random.shuffle(safe_animals)
+                for safe in safe_animals[:3]:
+                    if safe.lower() != animal_name.lower():
+                        pexels_result = pexels.get_animal_video(safe)
+                        if pexels_result:
+                            animal_name = safe
+                            # Regenerate fact for the new animal
+                            if self.workflow:
+                                animal = {'id': safe.lower(), 'name': safe, 'prompt_style': 'in its natural habitat'}
+                                fact_data = self.workflow._generate_fact(animal)
+                            break
+
+            if not pexels_result:
+                logger.error("Pexels fallback failed - no video found")
+                if task_id in _active_tasks:
+                    _active_tasks[task_id]['status'] = 'failed'
+                    _active_tasks[task_id]['error'] = f"{sora_error} | Pexels: no video"
+                return
+
+            video_url = pexels_result['video_url']
+            logger.info(f"✅ Pexels fallback video for {animal_name}: {video_url[:50]}...")
+
+            # Post to Blotato
+            blotato_key = os.environ.get('BLOTATO_API_KEY')
+            if blotato_key:
+                AnimalFactsWorkflow._post_blotato_v2(blotato_key, video_url, animal_name, fact_data)
+                logger.info(f"✅ Posted {animal_name} via Pexels fallback!")
+                if task_id in _active_tasks:
+                    _active_tasks[task_id]['status'] = 'posted_pexels'
+                    _active_tasks[task_id]['video_url'] = video_url
+
+                try:
+                    from core.alerter import get_alerter
+                    get_alerter().send_alert(
+                        f"📹 *PEXELS FALLBACK*\n\nSora failed: {sora_error[:100]}\nPosted {animal_name} via Pexels instead.",
+                        silent=True
+                    )
+                except:
+                    pass
+
+        except Exception as e:
+            logger.error(f"Pexels fallback error: {e}")
+            if task_id in _active_tasks:
+                _active_tasks[task_id]['status'] = 'failed'
+                _active_tasks[task_id]['error'] = f"{sora_error} | Pexels error: {str(e)}"
 
     def _compose_and_upload(self, video_url, fact_text, animal_name, task_id):
         """Compose video with fact overlay, upload to temp host, return public URL"""
