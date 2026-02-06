@@ -890,6 +890,48 @@ def api_test_pexels():
         }), 500
 
 
+@app.route('/api/debug/list-videos', methods=['GET'])
+def api_list_videos():
+    """List composed videos in static/videos directory"""
+    video_dir = os.path.join(os.getcwd(), 'static', 'videos')
+    if not os.path.exists(video_dir):
+        return jsonify({'videos': [], 'dir': video_dir})
+    files = sorted(os.listdir(video_dir), key=lambda f: os.path.getmtime(os.path.join(video_dir, f)), reverse=True)
+    return jsonify({'videos': files[:20], 'dir': video_dir, 'count': len(files)})
+
+
+@app.route('/api/debug/task-status/<task_id>', methods=['GET'])
+def api_task_status(task_id):
+    """Check the DB status of a video task"""
+    try:
+        from core.memory import PendingVideoTask, HAS_SQLALCHEMY
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        db_url = os.environ.get('DATABASE_URL', 'sqlite:///omni.db')
+        if db_url.startswith('postgres://'):
+            db_url = db_url.replace('postgres://', 'postgresql://', 1)
+        engine = create_engine(db_url)
+        Session = sessionmaker(bind=engine)
+        session = Session()
+        task = session.query(PendingVideoTask).filter(
+            PendingVideoTask.task_id.like(f"{task_id}%")
+        ).first()
+        if not task:
+            return jsonify({'error': 'Task not found'}), 404
+        return jsonify({
+            'task_id': task.task_id,
+            'animal': task.animal_name,
+            'status': task.status,
+            'video_url': task.video_url,
+            'error': task.error_message,
+            'progress': task.progress,
+            'created': str(task.created_at),
+            'completed': str(task.completed_at) if task.completed_at else None
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/debug/blotato-accounts', methods=['GET'])
 def api_blotato_accounts():
     """List all connected Blotato accounts with their IDs"""
