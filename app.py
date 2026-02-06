@@ -1456,6 +1456,66 @@ def api_debug_process_tasks():
         return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
 
 
+@app.route('/api/debug/sora-sync', methods=['POST'])
+def api_debug_sora_sync():
+    """
+    Synchronous Sora test - waits for completion (up to 5 minutes).
+    Use this to debug Kie.ai issues without background processing.
+    """
+    try:
+        init_omni()
+
+        data = request.json or {}
+        animal_name = data.get('animal', 'Lion')
+        duration = data.get('duration', 5)
+
+        from workflows.animal_facts import AnimalFactsWorkflow
+        workflow = AnimalFactsWorkflow(api_hub, model_router)
+
+        # Generate animal and fact
+        animal = {'id': animal_name.lower().replace(' ', '_'), 'name': animal_name, 'prompt_style': 'in its natural habitat'}
+        fact = workflow._generate_fact(animal)
+        sora_prompt = workflow._build_sora_prompt(animal, duration=duration)
+
+        # Start Sora generation
+        kie_key = os.environ.get('KIE_API_KEY')
+        if not kie_key:
+            return jsonify({'error': 'KIE_API_KEY not configured'}), 500
+
+        print(f"🎥 Starting Sora sync test for {animal_name}...")
+        task_id = workflow._kie_generate(kie_key, sora_prompt, duration=duration)
+        print(f"✅ Task started: {task_id}")
+
+        # Poll synchronously (blocking - waits up to 5 min)
+        print(f"⏳ Waiting for video (up to 5 minutes)...")
+        video_url = workflow._kie_poll(kie_key, task_id, max_wait=300)
+
+        if video_url:
+            return jsonify({
+                'status': 'success',
+                'animal': animal_name,
+                'fact': fact,
+                'video_url': video_url,
+                'task_id': task_id,
+                'message': 'Sora 2 video generated successfully!'
+            })
+        else:
+            return jsonify({
+                'status': 'timeout',
+                'animal': animal_name,
+                'task_id': task_id,
+                'message': 'Video generation timed out'
+            }), 504
+
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'status': 'error',
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
+
+
 # ============================================================
 # ADMIN PANEL
 # ============================================================
