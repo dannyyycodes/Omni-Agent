@@ -127,10 +127,18 @@ class VideoTaskProcessor:
             # Debug log the full response structure
             logger.info(f"📊 Kie.ai response for {task.task_id[:8]}: progress={progress}, has_result={bool(result_json)}, data_keys={list(data.keys())}")
 
-            # Check for failed status in response
-            status = data.get('status', '').lower()
-            if status in ['failed', 'error', 'cancelled']:
-                error_msg = data.get('errorMessage') or data.get('error') or f"Task {status}"
+            # Check for failed status in response (Kie.ai uses 'state' not 'status')
+            status = (data.get('state') or data.get('status') or '').lower()
+            if status in ['failed', 'error', 'cancelled', 'fail']:
+                error_msg = data.get('failMsg') or data.get('errorMessage') or data.get('error') or f"Task {status}"
+                logger.error(f"Kie.ai task failed for {task.task_id[:8]}: {error_msg}")
+                self._handle_task_error(task, error_msg)
+                return
+
+            # Also check failCode field directly
+            fail_code = data.get('failCode')
+            if fail_code and str(fail_code) != '0':
+                error_msg = data.get('failMsg') or f"Kie.ai failCode: {fail_code}"
                 logger.error(f"Kie.ai task failed for {task.task_id[:8]}: {error_msg}")
                 self._handle_task_error(task, error_msg)
                 return
