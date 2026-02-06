@@ -900,6 +900,24 @@ def api_list_videos():
     return jsonify({'videos': files[:20], 'dir': video_dir, 'count': len(files)})
 
 
+@app.route('/api/debug/active-tasks', methods=['GET'])
+def api_active_tasks():
+    """List in-memory active tasks (background threads)"""
+    from core.async_workflow_wrapper import get_active_tasks
+    tasks = get_active_tasks()
+    # Don't serialize fact_data (too large)
+    clean = {}
+    for tid, t in tasks.items():
+        clean[tid[:12]] = {
+            'animal': t.get('animal'),
+            'status': t.get('status'),
+            'progress': t.get('progress'),
+            'video_url': t.get('video_url', ''),
+            'error': t.get('error')
+        }
+    return jsonify({'count': len(clean), 'tasks': clean})
+
+
 @app.route('/api/debug/db-info', methods=['GET'])
 def api_db_info():
     """Show database connection info"""

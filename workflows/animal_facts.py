@@ -694,6 +694,77 @@ The prompt_style should describe a cinematic action the animal does."""
 
         return results
 
+    @staticmethod
+    def _post_blotato_v2(key, video_url, animal_name, fact_data):
+        """Static method for posting - can be called from background threads without a workflow instance"""
+        import requests as req
+
+        if isinstance(fact_data, dict):
+            short_fact = fact_data.get('short_fact', '')
+            description = fact_data.get('description', short_fact)
+            hashtags = fact_data.get('hashtags', '#AnimalFacts #Wildlife #Nature')
+        else:
+            short_fact = str(fact_data) if fact_data else ''
+            description = short_fact
+            hashtags = '#AnimalFacts #Wildlife #Nature #Animals'
+
+        yt_title = f"Did You Know This About {animal_name}? 🐾 #shorts"
+        if len(yt_title) > 100:
+            yt_title = f"{animal_name} Facts 🐾 #shorts"
+
+        accounts = AnimalFactsWorkflow.BLOTATO_ACCOUNTS
+        headers = {"blotato-api-key": key, "Content-Type": "application/json"}
+        base_url = "https://backend.blotato.com/v2/posts"
+        results = {}
+
+        # TikTok
+        try:
+            resp = req.post(base_url, headers=headers, json={
+                "post": {
+                    "accountId": accounts['tiktok'],
+                    "content": {"text": f"🐾 {short_fact}\n\n{hashtags}", "mediaUrls": [video_url], "platform": "tiktok"},
+                    "target": {"targetType": "tiktok", "privacyLevel": "PUBLIC_TO_EVERYONE", "disabledComments": False, "disabledDuet": False, "disabledStitch": False, "isBrandedContent": False, "isYourBrand": False, "isAiGenerated": True}
+                }
+            }, timeout=60)
+            results['tiktok'] = resp.status_code
+            logger.info(f"📱 TikTok: {resp.status_code}")
+        except Exception as e:
+            logger.error(f"TikTok failed: {e}")
+            results['tiktok'] = str(e)
+
+        # YouTube
+        try:
+            resp = req.post(base_url, headers=headers, json={
+                "post": {
+                    "accountId": accounts['youtube'],
+                    "content": {"text": f"{description}\n\n{hashtags}", "mediaUrls": [video_url], "platform": "youtube"},
+                    "target": {"targetType": "youtube", "title": yt_title, "privacyStatus": "public", "shouldNotifySubscribers": True, "isMadeForKids": False, "containsSyntheticMedia": True}
+                }
+            }, timeout=60)
+            results['youtube'] = resp.status_code
+            logger.info(f"📺 YouTube: {resp.status_code}")
+        except Exception as e:
+            logger.error(f"YouTube failed: {e}")
+            results['youtube'] = str(e)
+
+        # Instagram
+        try:
+            ig_text = f"🐾 {short_fact}\n\n{description}\n\nFollow @howanimalslove for more amazing animal facts!\n\n{hashtags}"
+            resp = req.post(base_url, headers=headers, json={
+                "post": {
+                    "accountId": accounts['instagram'],
+                    "content": {"text": ig_text, "mediaUrls": [video_url], "platform": "instagram"},
+                    "target": {"targetType": "instagram", "mediaType": "reel"}
+                }
+            }, timeout=60)
+            results['instagram'] = resp.status_code
+            logger.info(f"📸 Instagram: {resp.status_code}")
+        except Exception as e:
+            logger.error(f"Instagram failed: {e}")
+            results['instagram'] = str(e)
+
+        return results
+
     def preview(self, animal_id=None):
         """Generate a preview without actually calling video APIs (saves credits)"""
         if animal_id:
