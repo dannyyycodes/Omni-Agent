@@ -900,6 +900,19 @@ def api_list_videos():
     return jsonify({'videos': files[:20], 'dir': video_dir, 'count': len(files)})
 
 
+@app.route('/api/debug/db-info', methods=['GET'])
+def api_db_info():
+    """Show database connection info"""
+    db_url = os.environ.get('DATABASE_URL', 'NOT SET - using sqlite:///omni.db')
+    # Mask credentials
+    if '@' in db_url:
+        parts = db_url.split('@')
+        db_url_safe = '***@' + parts[-1]
+    else:
+        db_url_safe = db_url
+    return jsonify({'database_url': db_url_safe, 'has_database_url_env': bool(os.environ.get('DATABASE_URL'))})
+
+
 @app.route('/api/debug/all-tasks', methods=['GET'])
 def api_all_tasks():
     """List ALL video tasks in the database"""
