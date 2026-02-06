@@ -928,6 +928,51 @@ def api_test_compose_check():
     return jsonify(results)
 
 
+@app.route('/api/debug/test-download', methods=['POST'])
+def api_test_download():
+    """Test just the video download step"""
+    import traceback as tb
+    try:
+        data = request.json or {}
+        video_url = data.get('video_url')
+        if not video_url:
+            return jsonify({'error': 'video_url required'}), 400
+
+        import tempfile
+        import requests as req
+
+        tmp_dir = tempfile.mkdtemp()
+        temp_path = os.path.join(tmp_dir, 'test_download.mp4')
+
+        resp = req.get(video_url, stream=True, timeout=30)
+        result = {
+            'status_code': resp.status_code,
+            'content_type': resp.headers.get('Content-Type', 'unknown'),
+            'content_length': resp.headers.get('Content-Length', 'unknown'),
+        }
+
+        if resp.status_code == 200:
+            total = 0
+            with open(temp_path, 'wb') as f:
+                for chunk in resp.iter_content(chunk_size=8192):
+                    f.write(chunk)
+                    total += len(chunk)
+            result['downloaded_bytes'] = total
+            result['file_exists'] = os.path.exists(temp_path)
+            result['file_size'] = os.path.getsize(temp_path) if os.path.exists(temp_path) else 0
+            # Cleanup
+            try:
+                os.remove(temp_path)
+            except:
+                pass
+        else:
+            result['response_body'] = resp.text[:500]
+
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e), 'traceback': tb.format_exc()}), 500
+
+
 @app.route('/api/debug/test-compose-upload', methods=['POST'])
 def api_test_compose_upload():
     """Test compose + upload pipeline WITHOUT posting to Blotato.
