@@ -898,7 +898,8 @@ def api_blotato_accounts():
         if not blotato_key:
             return jsonify({'error': 'BLOTATO_API_KEY not configured'}), 500
 
-        resp = requests.get(
+        import requests as req
+        resp = req.get(
             "https://backend.blotato.com/v2/users/me/accounts",
             headers={"blotato-api-key": blotato_key},
             timeout=30
