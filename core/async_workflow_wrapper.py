@@ -327,10 +327,23 @@ class AsyncWorkflowWrapper:
             video_url = pexels_result['video_url']
             logger.info(f"✅ Pexels fallback video for {animal_name}: {video_url[:50]}...")
 
+            # Compose video with fact overlay before posting
+            short_fact = fact_data.get('short_fact', '') if isinstance(fact_data, dict) else str(fact_data)
+            final_url = video_url
+            try:
+                composed_url = self._compose_and_upload(video_url, short_fact, animal_name, task_id)
+                if composed_url:
+                    final_url = composed_url
+                    logger.info(f"✅ Pexels composed + uploaded: {composed_url[:60]}...")
+                else:
+                    logger.warning("Pexels composition failed, posting raw video")
+            except Exception as e:
+                logger.error(f"Pexels composition error: {e}, posting raw video")
+
             # Post to Blotato
             blotato_key = os.environ.get('BLOTATO_API_KEY')
             if blotato_key:
-                AnimalFactsWorkflow._post_blotato_v2(blotato_key, video_url, animal_name, fact_data)
+                AnimalFactsWorkflow._post_blotato_v2(blotato_key, final_url, animal_name, fact_data)
                 logger.info(f"✅ Posted {animal_name} via Pexels fallback!")
                 if task_id in _active_tasks:
                     _active_tasks[task_id]['status'] = 'posted_pexels'

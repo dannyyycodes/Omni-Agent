@@ -900,6 +900,39 @@ def api_list_videos():
     return jsonify({'videos': files[:20], 'dir': video_dir, 'count': len(files)})
 
 
+@app.route('/api/debug/test-compose-upload', methods=['POST'])
+def api_test_compose_upload():
+    """Test compose + upload pipeline WITHOUT posting to Blotato.
+    Takes a video_url, composes with fact overlay, uploads to 0x0.st, returns the hosted URL."""
+    try:
+        data = request.json or {}
+        video_url = data.get('video_url')
+        fact = data.get('fact', 'Test fact about this amazing animal')
+        animal = data.get('animal', 'Test Animal')
+
+        if not video_url:
+            return jsonify({'error': 'video_url required'}), 400
+
+        from core.async_workflow_wrapper import AsyncWorkflowWrapper
+        wrapper = AsyncWorkflowWrapper(None)
+        composed_url = wrapper._compose_and_upload(video_url, fact, animal, 'test_dry_run')
+
+        if composed_url:
+            return jsonify({
+                'status': 'success',
+                'composed_url': composed_url,
+                'original_url': video_url,
+                'fact': fact,
+                'animal': animal,
+                'message': 'Composed and uploaded. NOT posted to Blotato.'
+            })
+        else:
+            return jsonify({'status': 'failed', 'message': 'Composition or upload failed'}), 500
+    except Exception as e:
+        import traceback
+        return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
+
+
 @app.route('/api/debug/test-blotato-post', methods=['POST'])
 def api_test_blotato_post():
     """Test posting a video to Blotato v2 with specific accounts"""
