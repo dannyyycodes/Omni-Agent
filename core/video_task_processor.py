@@ -162,9 +162,24 @@ class VideoTaskProcessor:
         try:
             # Parse result
             result_data = json.loads(result_json) if isinstance(result_json, str) else result_json
-            video_url = (result_data.get('videoUrl') or 
-                       result_data.get('video_url') or 
-                       result_data.get('url'))
+
+            # Kie.ai may return video URL in different formats:
+            # - resultUrls: ["url1", "url2"] (array of URLs)
+            # - videoUrl: "url"
+            # - video_url: "url"
+            # - url: "url"
+            video_url = None
+
+            # Check for resultUrls array first (Kie.ai format)
+            result_urls = result_data.get('resultUrls', [])
+            if result_urls and len(result_urls) > 0:
+                video_url = result_urls[0]
+                logger.info(f"Found video URL in resultUrls array: {video_url[:50]}...")
+            else:
+                # Try other common field names
+                video_url = (result_data.get('videoUrl') or
+                           result_data.get('video_url') or
+                           result_data.get('url'))
             
             if not video_url:
                 logger.warning(f"No video URL in resultJson for {task.task_id}")
