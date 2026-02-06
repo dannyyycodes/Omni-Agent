@@ -24,12 +24,15 @@ class VideoComposer:
         """
         # 1. Download/Get Video
         video_path = self._download_video(video_url)
+        if not video_path:
+            print(f"Failed to download video from {video_url[:80]}")
+            return None
 
         try:
             video_clip = VideoFileClip(video_path)
         except Exception as e:
             print(f"Error loading video: {e}")
-            return video_path
+            return None
 
         # 2. Convert to 9:16 portrait (1080x1920 standard)
         target_width = 1080
@@ -213,19 +216,30 @@ class VideoComposer:
         """Download video from URL to temp file, or use local file"""
         if os.path.exists(url):
             return url
-            
+
         temp_path = os.path.join(self.output_dir, 'temp_source.mp4')
         try:
-            response = requests.get(url, stream=True, timeout=120)
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'Accept': 'video/mp4,video/*,*/*',
+                'Referer': 'https://www.pexels.com/',
+            }
+            response = requests.get(url, stream=True, timeout=120, headers=headers)
             if response.status_code == 200:
                 with open(temp_path, 'wb') as f:
                     for chunk in response.iter_content(chunk_size=8192):
                         f.write(chunk)
-                return temp_path
+                file_size = os.path.getsize(temp_path)
+                if file_size > 1000:  # Valid video should be > 1KB
+                    return temp_path
+                else:
+                    print(f"Downloaded file too small ({file_size} bytes), likely not a valid video")
+            else:
+                print(f"Download failed: HTTP {response.status_code}")
         except Exception as e:
             print(f"Download error: {e}")
-            
-        return url
+
+        return None
         
     def _create_text_bar(self, fact_text, title, width=1080, height=400):
         # Check for template

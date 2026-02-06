@@ -944,7 +944,12 @@ def api_test_download():
         tmp_dir = tempfile.mkdtemp()
         temp_path = os.path.join(tmp_dir, 'test_download.mp4')
 
-        resp = req.get(video_url, stream=True, timeout=30)
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept': 'video/mp4,video/*,*/*',
+            'Referer': 'https://www.pexels.com/',
+        }
+        resp = req.get(video_url, stream=True, timeout=30, headers=headers)
         result = {
             'status_code': resp.status_code,
             'content_type': resp.headers.get('Content-Type', 'unknown'),
