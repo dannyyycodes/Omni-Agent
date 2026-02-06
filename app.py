@@ -1456,6 +1456,32 @@ def api_debug_process_tasks():
         return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
 
 
+@app.route('/api/debug/poll-kie/<task_id>', methods=['GET'])
+def api_debug_poll_kie(task_id):
+    """Debug: Poll Kie.ai directly and return raw response"""
+    try:
+        import requests
+        kie_key = os.environ.get('KIE_API_KEY')
+        if not kie_key:
+            return jsonify({'error': 'KIE_API_KEY not configured'}), 500
+
+        headers = {"Authorization": f"Bearer {kie_key}"}
+        resp = requests.get(
+            f"https://api.kie.ai/api/v1/jobs/recordInfo?taskId={task_id}",
+            headers=headers,
+            timeout=30
+        )
+
+        return jsonify({
+            'http_status': resp.status_code,
+            'response': resp.json() if resp.status_code == 200 else resp.text
+        })
+
+    except Exception as e:
+        import traceback
+        return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
+
+
 @app.route('/api/debug/sora-sync', methods=['POST'])
 def api_debug_sora_sync():
     """

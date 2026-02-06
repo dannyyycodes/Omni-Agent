@@ -112,15 +112,20 @@ class VideoTaskProcessor:
 
             # Check for error in response body
             resp_data = resp.json()
-            if resp_data.get('code') and resp_data.get('code') != 200:
+            # Kie.ai returns code: 0 or code: 200 for success
+            resp_code = resp_data.get('code')
+            if resp_code is not None and resp_code not in [0, 200]:
                 error_msg = resp_data.get('message', 'Unknown Kie.ai error')
-                logger.error(f"Kie.ai error for {task.task_id[:8]}: {error_msg}")
+                logger.error(f"Kie.ai error for {task.task_id[:8]}: code={resp_code}, msg={error_msg}")
                 self._handle_task_error(task, error_msg)
                 return
 
             data = resp_data.get('data', {})
             progress = data.get('progress', 0)
             result_json = data.get('resultJson', '')
+
+            # Debug log the full response structure
+            logger.info(f"📊 Kie.ai response for {task.task_id[:8]}: progress={progress}, has_result={bool(result_json)}, data_keys={list(data.keys())}")
 
             # Check for failed status in response
             status = data.get('status', '').lower()
