@@ -211,7 +211,7 @@ class VideoTaskProcessor:
 
                 if final_video_path and os.path.exists(final_video_path):
                     # Convert local path to public URL so it's accessible externally
-                    railway_domain = os.environ.get('RAILWAY_PUBLIC_DOMAIN', '')
+                    railway_domain = os.environ.get('RAILWAY_PUBLIC_DOMAIN', 'web-production-770b9.up.railway.app')
                     if railway_domain:
                         # Extract relative path from static/ onwards
                         static_idx = final_video_path.replace('\\', '/').find('static/')
