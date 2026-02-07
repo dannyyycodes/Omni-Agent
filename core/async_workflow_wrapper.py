@@ -388,33 +388,83 @@ class AsyncWorkflowWrapper:
             file_size = os.path.getsize(composed_path)
             logger.info(f"📦 Composed video: {file_size / 1024 / 1024:.1f}MB")
 
-            # Upload to 0x0.st (free, no API key, 30-day retention)
+            # Upload to file hosting - try multiple services
             logger.info("📤 Uploading composed video to temp host...")
-            with open(composed_path, 'rb') as f:
-                upload_resp = requests.post(
-                    'https://0x0.st',
-                    files={'file': (output_filename, f, 'video/mp4')},
-                    timeout=120
-                )
+            hosted_url = self._upload_to_host(composed_path, output_filename)
 
-            if upload_resp.status_code == 200:
-                hosted_url = upload_resp.text.strip()
-                logger.info(f"✅ Uploaded: {hosted_url}")
+            # Cleanup local file
+            try:
+                os.remove(composed_path)
+            except:
+                pass
 
-                # Cleanup local file
-                try:
-                    os.remove(composed_path)
-                except:
-                    pass
-
-                return hosted_url
-            else:
-                logger.error(f"Upload failed: {upload_resp.status_code} {upload_resp.text[:100]}")
-                return None
+            return hosted_url
 
         except Exception as e:
             logger.error(f"Compose+upload failed: {e}")
             return None
+
+    def _upload_to_host(self, file_path, filename):
+        """Upload a file to a temp hosting service, trying multiple hosts"""
+        file_size = os.path.getsize(file_path)
+        # Increase timeout for larger files (1 min per 5MB, minimum 120s)
+        timeout = max(120, int(file_size / (5 * 1024 * 1024)) * 60)
+
+        # Try file.io first (accepts up to 2GB, auto-deletes after download)
+        try:
+            logger.info(f"Trying file.io upload ({file_size / 1024 / 1024:.1f}MB, timeout={timeout}s)...")
+            with open(file_path, 'rb') as f:
+                resp = requests.post(
+                    'https://file.io',
+                    files={'file': (filename, f, 'video/mp4')},
+                    timeout=timeout
+                )
+            if resp.status_code == 200:
+                data = resp.json()
+                if data.get('success') and data.get('link'):
+                    logger.info(f"✅ file.io upload: {data['link']}")
+                    return data['link']
+        except Exception as e:
+            logger.warning(f"file.io failed: {e}")
+
+        # Try 0x0.st as fallback
+        try:
+            logger.info(f"Trying 0x0.st upload...")
+            with open(file_path, 'rb') as f:
+                resp = requests.post(
+                    'https://0x0.st',
+                    files={'file': (filename, f, 'video/mp4')},
+                    timeout=timeout
+                )
+            if resp.status_code == 200:
+                url = resp.text.strip()
+                logger.info(f"✅ 0x0.st upload: {url}")
+                return url
+        except Exception as e:
+            logger.warning(f"0x0.st failed: {e}")
+
+        # Try tmpfiles.org as last resort
+        try:
+            logger.info(f"Trying tmpfiles.org upload...")
+            with open(file_path, 'rb') as f:
+                resp = requests.post(
+                    'https://tmpfiles.org/api/v1/upload',
+                    files={'file': (filename, f, 'video/mp4')},
+                    timeout=timeout
+                )
+            if resp.status_code == 200:
+                data = resp.json()
+                url = data.get('data', {}).get('url', '')
+                if url:
+                    # Convert view URL to direct download URL
+                    url = url.replace('tmpfiles.org/', 'tmpfiles.org/dl/')
+                    logger.info(f"✅ tmpfiles.org upload: {url}")
+                    return url
+        except Exception as e:
+            logger.warning(f"tmpfiles.org failed: {e}")
+
+        logger.error("All upload hosts failed")
+        return None
 
 
 def get_active_tasks():

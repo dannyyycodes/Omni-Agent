@@ -49,7 +49,12 @@ class VideoComposer:
         final = CompositeVideoClip([video_clip, bar_clip], size=(target_width, target_height))
 
         out_path = os.path.join(self.output_dir, output_filename)
-        final.write_videofile(out_path, codec='libx264', audio_codec='aac', fps=30, verbose=False, logger=None)
+        final.write_videofile(
+            out_path, codec='libx264', audio_codec='aac', fps=30,
+            bitrate='2000k',  # Cap bitrate for smaller files (~3-5MB for 10s)
+            preset='fast',
+            verbose=False, logger=None
+        )
 
         return out_path
 

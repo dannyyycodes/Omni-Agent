@@ -1049,19 +1049,20 @@ def api_test_compose_upload():
             steps['step2_compose'] = f'failed - returned: {composed_path}'
             return jsonify({'status': 'failed', 'steps': steps}), 500
 
-        # Step 3: Upload to temp host
+        # Step 3: Upload to temp host using the wrapper's upload method
         steps['step3_upload'] = 'starting'
-        import requests as req
-        with open(composed_path, 'rb') as f:
-            upload_resp = req.post(
-                'https://0x0.st',
-                files={'file': ('test_dry_run.mp4', f, 'video/mp4')},
-                timeout=120
-            )
-        steps['step3_upload'] = f'status={upload_resp.status_code}, body={upload_resp.text[:200]}'
+        from core.async_workflow_wrapper import AsyncWorkflowWrapper
+        wrapper = AsyncWorkflowWrapper(None)
+        hosted_url = wrapper._upload_to_host(composed_path, 'test_dry_run.mp4')
+        steps['step3_upload'] = f'result={hosted_url}'
 
-        if upload_resp.status_code == 200:
-            hosted_url = upload_resp.text.strip()
+        # Cleanup
+        try:
+            os.remove(composed_path)
+        except:
+            pass
+
+        if hosted_url:
             return jsonify({
                 'status': 'success',
                 'composed_url': hosted_url,
